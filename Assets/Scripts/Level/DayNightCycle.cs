@@ -33,21 +33,41 @@ public class DayNightCycle : MonoBehaviour
         return Color.Lerp(night, Color.Lerp(dusk, day, high), dayF);
     }
 
+    static readonly int ZenithId = Shader.PropertyToID("_ZenithColor"), HorizonId = Shader.PropertyToID("_HorizonColor"), GroundId = Shader.PropertyToID("_GroundColor"),
+                        SunColorId = Shader.PropertyToID("_SunColor"), SunDirId = Shader.PropertyToID("_SunDir"), MoonDirId = Shader.PropertyToID("_MoonDir"),
+                        MoonColorId = Shader.PropertyToID("_MoonColor"), StarsId = Shader.PropertyToID("_StarIntensity"), CloudColorId = Shader.PropertyToID("_CloudColor"),
+                        GlobalZenithId = Shader.PropertyToID("_PG_SkyZenith"), GlobalHorizonId = Shader.PropertyToID("_PG_SkyHorizon");
+
+    Material runtimeSky;                                         // the copy animated in Play mode (the asset stays as it is)
+    float appliedTime = -1f;
+
+    Material Sky { get { return runtimeSky != null ? runtimeSky : sky; } }
+
     void OnEnable()
     {
-        if (Application.isPlaying && sky != null) sky = new Material(sky);      // animate a copy, not the asset
+        if (Application.isPlaying && sky != null && runtimeSky == null) runtimeSky = new Material(sky) { name = sky.name + " (runtime)" };
         Apply();
     }
+
+    void OnDestroy()
+    {
+        if (runtimeSky == null) return;
+        if (RenderSettings.skybox == runtimeSky) RenderSettings.skybox = sky;
+        Destroy(runtimeSky); runtimeSky = null;                  // one copy per enable used to be leaked
+    }
+
     void OnValidate() { Apply(); }
 
     void Update()
     {
         if (Application.isPlaying && running && dayLength > 1f) timeOfDay = Mathf.Repeat(timeOfDay + Time.deltaTime / dayLength, 1f);
-        Apply();
+        // the light changes slowly: re-apply at 1/4096 of a day (0.06 s for a 4 min day) instead of every frame
+        if (Mathf.Abs(timeOfDay - appliedTime) >= 1f / 4096f) Apply();
     }
 
     public void Apply()
     {
+        appliedTime = timeOfDay;
         Quaternion path = Quaternion.Euler(0f, azimuth, 0f) * Quaternion.Euler(0f, 0f, tilt);
         Vector3 sunFwd = path * (Quaternion.Euler((timeOfDay - 0.25f) * 360f, 0f, 0f) * Vector3.forward);   // direction the light travels
         Vector3 toSun = -sunFwd, toMoon = sunFwd;
@@ -81,22 +101,22 @@ public class DayNightCycle : MonoBehaviour
         RenderSettings.ambientSkyColor = Mix3(new Color(0.14f, 0.19f, 0.34f), new Color(0.45f, 0.40f, 0.55f), new Color(0.62f, 0.72f, 0.86f), DayFactor, high);
         RenderSettings.ambientEquatorColor = Mix3(new Color(0.10f, 0.13f, 0.22f), new Color(0.48f, 0.36f, 0.32f), new Color(0.50f, 0.56f, 0.52f), DayFactor, high);
         RenderSettings.ambientGroundColor = Mix3(new Color(0.04f, 0.05f, 0.08f), new Color(0.14f, 0.12f, 0.10f), new Color(0.20f, 0.22f, 0.16f), DayFactor, high);
-        Shader.SetGlobalColor("_PG_SkyZenith", zenith);
-        Shader.SetGlobalColor("_PG_SkyHorizon", horizon);
+        Shader.SetGlobalColor(GlobalZenithId, zenith);
+        Shader.SetGlobalColor(GlobalHorizonId, horizon);
 
-        if (sky != null)
+        var s = Sky;
+        if (s != null)
         {
-            sky.SetColor("_ZenithColor", zenith);
-            sky.SetColor("_HorizonColor", horizon);
-            sky.SetColor("_GroundColor", fog);
-            sky.SetColor("_SunColor", Color.Lerp(SunDusk, SunDay, high) * Mathf.Lerp(1.15f, 1f, high));
-            sky.SetVector("_SunDir", toSun);
-            sky.SetVector("_MoonDir", toMoon);
-            var mc = new Color(0.86f, 0.90f, 1f, 1f - DayFactor * 0.85f);
-            sky.SetColor("_MoonColor", mc);
-            sky.SetFloat("_StarIntensity", Mathf.Pow(1f - DayFactor, 2f) * 1.3f);
-            sky.SetColor("_CloudColor", Mix3(new Color(0.07f, 0.09f, 0.16f), new Color(1f, 0.62f, 0.46f), new Color(1f, 1f, 1f), DayFactor, high));
-            if (RenderSettings.skybox != sky) RenderSettings.skybox = sky;
+            s.SetColor(ZenithId, zenith);
+            s.SetColor(HorizonId, horizon);
+            s.SetColor(GroundId, fog);
+            s.SetColor(SunColorId, Color.Lerp(SunDusk, SunDay, high) * Mathf.Lerp(1.15f, 1f, high));
+            s.SetVector(SunDirId, toSun);
+            s.SetVector(MoonDirId, toMoon);
+            s.SetColor(MoonColorId, new Color(0.86f, 0.90f, 1f, 1f - DayFactor * 0.85f));
+            s.SetFloat(StarsId, Mathf.Pow(1f - DayFactor, 2f) * 1.3f);
+            s.SetColor(CloudColorId, Mix3(new Color(0.07f, 0.09f, 0.16f), new Color(1f, 0.62f, 0.46f), new Color(1f, 1f, 1f), DayFactor, high));
+            if (RenderSettings.skybox != s) RenderSettings.skybox = s;
         }
     }
 }

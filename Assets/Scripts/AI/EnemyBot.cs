@@ -19,14 +19,19 @@ public class EnemyBot : MonoBehaviour
     public bool IsDying { get; private set; }
 
     public static readonly List<EnemyBot> All = new List<EnemyBot>();
+    static readonly Unity.Profiling.ProfilerMarker SepMarker = new Unity.Profiling.ProfilerMarker("EnemyBot.Separation"),
+                                                   MoveMarker = new Unity.Profiling.ProfilerMarker("EnemyBot.Move");
 
     static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), FlashId = Shader.PropertyToID("_Flash");
     CharacterController cc;
     MaterialPropertyBlock block;
     Transform target; PlayerHealth targetHealth;
     Color glow = new Color(1f, 0.35f, 0.1f);
-    float vy, nextAttack, flash, stuckCheck, sidestepUntil, sideSign = 1f, dieTime;
+    float vy, nextAttack, flash, stuckCheck, sidestepUntil, sideSign = 1f, dieTime, pendingDt;
     Vector3 lastPos, baseScale;
+    int gridIndex = -1, lodSlot;
+    /// <summary>Within this distance of the player a bot is updated every frame, farther every third frame.</summary>
+    const float FullRateDistance = 40f;
 
     // Ignore Raycast: the capsule only moves the bot, bullets test the visible box (RaycastBodies)
     void Awake() { gameObject.layer = 2; }
@@ -72,6 +77,7 @@ public class EnemyBot : MonoBehaviour
         maxHealth = health; Health = health; speed = moveSpeed; damage = hitDamage; glow = glowColor;
         transform.localScale = Vector3.one * size; baseScale = transform.localScale;
         lastPos = transform.position; stuckCheck = Time.time + 1f; sideSign = Random.value < 0.5f ? -1f : 1f;
+        lodSlot = Random.Range(0, 3); pendingDt = 0f;                  // spread the far bots over the three frames
         ApplyLook();
     }
 
@@ -84,7 +90,7 @@ public class EnemyBot : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
-        if (IsDying) return;
+        if (IsDying || !(amount > 0f)) return;                          // no healing through negative or NaN damage
         Health -= amount; flash = 1f; ApplyLook();
         if (Health <= 0f) Die(true);
     }
@@ -95,6 +101,52 @@ public class EnemyBot : MonoBehaviour
         IsDying = true; dieTime = Time.time;
         if (cc != null) cc.enabled = false;
         if (killedByPlayer && WaveSurvivalGame.Instance != null) WaveSurvivalGame.Instance.OnBotKilled(this);
+    }
+
+    // ---- neighbours: one spatial hash per frame instead of every bot reading every other bot's transform (O(n²))
+    const float SeparationRadius2 = 2.6f;                       // squared distance at which two bots push apart
+    const float CellSize = 1.62f;                                // >= the separation radius: neighbours are in the 3x3 cells around
+    static int gridFrame = -1;
+    static Vector3[] gridPos = new Vector3[256];
+    static int[] gridNext = new int[256];
+    static readonly Dictionary<long, int> gridHead = new Dictionary<long, int>(512);
+
+    static long CellKey(int x, int z) { return ((long)x << 32) ^ (uint)z; }
+
+    static void BuildGrid()
+    {
+        gridFrame = Time.frameCount;
+        int n = All.Count;
+        if (gridPos.Length < n) { gridPos = new Vector3[n * 2]; gridNext = new int[n * 2]; }
+        gridHead.Clear();
+        for (int i = 0; i < n; i++)
+        {
+            var b = All[i]; b.gridIndex = i;
+            Vector3 p = b.transform.position; gridPos[i] = p;
+            if (b.IsDying) { gridNext[i] = -1; continue; }
+            long k = CellKey(Mathf.FloorToInt(p.x / CellSize), Mathf.FloorToInt(p.z / CellSize));
+            int head; gridNext[i] = gridHead.TryGetValue(k, out head) ? head : -1;
+            gridHead[k] = i;
+        }
+    }
+
+    Vector3 Separation(Vector3 pos)
+    {
+        if (gridFrame != Time.frameCount) BuildGrid();
+        Vector3 sep = Vector3.zero;
+        int cx = Mathf.FloorToInt(pos.x / CellSize), cz = Mathf.FloorToInt(pos.z / CellSize);
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                int i; if (!gridHead.TryGetValue(CellKey(cx + dx, cz + dz), out i)) continue;
+                for (; i >= 0; i = gridNext[i])
+                {
+                    if (i == gridIndex) continue;
+                    Vector3 d = pos - gridPos[i]; d.y = 0f; float m = d.sqrMagnitude;
+                    if (m < SeparationRadius2 && m > 0.0001f) sep += d / m;
+                }
+            }
+        return sep;
     }
 
     void Update()
@@ -112,6 +164,11 @@ public class EnemyBot : MonoBehaviour
 
         Vector3 pos = transform.position, to = target.position - pos; to.y = 0f;
         float dist = to.magnitude;
+        // far from the player a bot thinks and moves every third frame, with the time saved up: a third of the CharacterController cost
+        pendingDt += dt;
+        if (dist > FullRateDistance && (Time.frameCount + lodSlot) % 3 != 0) return;
+        dt = Mathf.Min(pendingDt, 0.1f); pendingDt = 0f;
+
         Vector3 dir = dist > 0.01f ? to / dist : transform.forward;
         if (dist <= attackRange)
         {
@@ -122,19 +179,14 @@ public class EnemyBot : MonoBehaviour
         }
         else
         {
-            Vector3 sep = Vector3.zero;                               // keep the crowd from collapsing into one point
-            for (int i = 0; i < All.Count; i++)
-            {
-                var o = All[i]; if (o == this || o.IsDying) continue;
-                Vector3 d = pos - o.transform.position; d.y = 0f; float m = d.sqrMagnitude;
-                if (m < 2.6f && m > 0.0001f) sep += d / m;
-            }
+            Vector3 sep;                                              // keep the crowd from collapsing into one point
+            using (SepMarker.Auto()) sep = Separation(pos);
             if (Time.time < sidestepUntil) dir = (dir * 0.35f + new Vector3(-dir.z, 0f, dir.x) * sideSign).normalized;
             Vector3 move = (dir + sep * 0.9f); move.y = 0f;
             if (move.sqrMagnitude > 1f) move.Normalize();
             vy = cc.isGrounded ? -2f : vy - 25f * dt;
-            cc.Move((move * speed + Vector3.up * vy) * dt);
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), dt * 8f);
+            using (MoveMarker.Auto()) cc.Move((move * speed + Vector3.up * vy) * dt);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Mathf.Min(1f, dt * 8f));
 
             if (Time.time >= stuckCheck)                              // blocked by a rock, a tree or a wall of rocks: go around
             {

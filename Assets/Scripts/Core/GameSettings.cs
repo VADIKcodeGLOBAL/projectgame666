@@ -14,21 +14,31 @@ public static class GameSettings
     static float master = DefaultMaster, music = DefaultMusic, shots = DefaultShots, fov = DefaultFov;
 
     /// <summary>0..1, everything the player hears.</summary>
-    public static float MasterVolume { get { return master; } set { master = Mathf.Clamp01(value); AudioListener.volume = master; } }
+    public static float MasterVolume { get { return master; } set { master = Clamp(value, 0f, 1f, DefaultMaster); AudioListener.volume = master; } }
     /// <summary>0..1, on top of the overall volume.</summary>
-    public static float MusicVolume { get { return music; } set { music = Mathf.Clamp01(value); } }
+    public static float MusicVolume { get { return music; } set { music = Clamp(value, 0f, 1f, DefaultMusic); } }
     /// <summary>0..1, weapon shots, on top of the overall volume.</summary>
-    public static float ShotVolume { get { return shots; } set { shots = Mathf.Clamp01(value); } }
+    public static float ShotVolume { get { return shots; } set { shots = Clamp(value, 0f, 1f, DefaultShots); } }
     /// <summary>Vertical field of view of the player camera, degrees.</summary>
-    public static float Fov { get { return fov; } set { fov = Mathf.Clamp(value, MinFov, MaxFov); } }
+    public static float Fov { get { return fov; } set { fov = Clamp(value, MinFov, MaxFov, DefaultFov); } }
+
+    // Mathf.Clamp lets NaN through, and a NaN volume or FOV breaks the audio or the camera
+    static float Clamp(float v, float min, float max, float fallback) { return float.IsNaN(v) ? fallback : Mathf.Clamp(v, min, max); }
+
+    /// <summary>PlayerPrefs live in the registry / a plain file and can hold anything: NaN or infinity falls back to the default.</summary>
+    static float Read(string key, float fallback)
+    {
+        float v = PlayerPrefs.GetFloat(key, fallback);
+        return float.IsNaN(v) || float.IsInfinity(v) ? fallback : v;
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     public static void Load()
     {
-        MasterVolume = PlayerPrefs.GetFloat(KeyMaster, DefaultMaster);
-        MusicVolume = PlayerPrefs.GetFloat(KeyMusic, DefaultMusic);
-        ShotVolume = PlayerPrefs.GetFloat(KeyShots, DefaultShots);
-        Fov = PlayerPrefs.GetFloat(KeyFov, DefaultFov);
+        MasterVolume = Read(KeyMaster, DefaultMaster);
+        MusicVolume = Read(KeyMusic, DefaultMusic);
+        ShotVolume = Read(KeyShots, DefaultShots);
+        Fov = Read(KeyFov, DefaultFov);
     }
 
     public static void Save()

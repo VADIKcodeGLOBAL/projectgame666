@@ -17,7 +17,7 @@ public class PlayerHealth : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
-        if (IsDead || amount <= 0f) return;
+        if (IsDead || !(amount > 0f)) return;                      // NaN would turn the health into NaN
         Health = Mathf.Max(0f, Health - amount);
         DamagePulse = 1f;
     }

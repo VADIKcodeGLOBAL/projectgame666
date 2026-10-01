@@ -78,7 +78,11 @@ public class WaveSurvivalGame : MonoBehaviour
     {
         if (IsOver)
         {
-            if (Input.GetKeyDown(KeyCode.R)) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                var scene = SceneManager.GetActiveScene();                // a scene missing from the build list has index -1
+                if (scene.buildIndex >= 0) SceneManager.LoadScene(scene.buildIndex); else SceneManager.LoadScene(scene.name);
+            }
             return;
         }
         float dt = Time.deltaTime;

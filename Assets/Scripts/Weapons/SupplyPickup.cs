@@ -60,12 +60,12 @@ public class SupplyPickup : MonoBehaviour
                 if (!inv.GiveMagazine()) return false;
                 Announce(inv.PickupText, kind); return true;
             case Kind.Medkit:
-                var hp = inv.GetComponent<PlayerHealth>();
+                var hp = inv.Health;
                 if (hp == null || hp.IsDead || hp.IsFull) return false;
                 float before = hp.Health; hp.Heal(heal);
                 Announce("+" + Mathf.RoundToInt(hp.Health - before) + " HP  MEDKIT", kind); return true;
             case Kind.Speed:
-                var fp = inv.GetComponent<SimpleFirstPersonController>();
+                var fp = inv.Controller;
                 if (fp == null) return false;
                 fp.ApplySpeedBoost(speedMultiplier, speedDuration);
                 Announce("SPEED +" + Mathf.RoundToInt((speedMultiplier - 1f) * 100f) + " %  FOR " + Mathf.RoundToInt(speedDuration) + " S", kind); return true;

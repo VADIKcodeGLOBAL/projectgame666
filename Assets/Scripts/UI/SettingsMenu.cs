@@ -13,7 +13,7 @@ public class SettingsMenu : MonoBehaviour
     GUIStyle title, label, value, button, note;
     float timeScaleBefore = 1f;
 
-    void Awake() { IsOpen = false; Time.timeScale = 1f; }
+    void Awake() { IsOpen = false; Time.timeScale = 1f; useGUILayout = false; }   // GUI.* only: skip the Layout event
     void OnDestroy() { if (IsOpen) { IsOpen = false; Time.timeScale = 1f; } }
 
     void Update()

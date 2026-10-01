@@ -15,6 +15,9 @@ public class WeaponInventory : MonoBehaviour
     public float scopeTime = 0.18f;
 
     public static WeaponInventory Instance { get; private set; }
+    /// <summary>The player's components, cached for the supplies.</summary>
+    public PlayerHealth Health { get; private set; }
+    public SimpleFirstPersonController Controller { get { return fp; } }
     public int CurrentIndex { get; private set; }
     public Weapon Current { get { return weapons != null && weapons.Length > 0 ? weapons[CurrentIndex] : null; } }
     /// <summary>0..1 how far the scope is up.</summary>
@@ -38,10 +41,11 @@ public class WeaponInventory : MonoBehaviour
     void Awake()
     {
         Instance = this;
-        fp = GetComponent<SimpleFirstPersonController>();
+        fp = GetComponent<SimpleFirstPersonController>(); Health = GetComponent<PlayerHealth>();
         baseFov = GameSettings.Fov;
         if (cam != null) cam.fieldOfView = baseFov;
-        if (weapons == null) weapons = new Weapon[0];
+        weapons = weapons == null ? new Weapon[0] : System.Array.FindAll(weapons, x => x != null);   // a missing reference must not break the rest
+        if (weapons.Length == 0) { enabled = false; return; }
         for (int i = 0; i < weapons.Length; i++) { weapons[i].Init(this); weapons[i].gameObject.SetActive(i == CurrentIndex); }
         if (audioSource != null)
         {

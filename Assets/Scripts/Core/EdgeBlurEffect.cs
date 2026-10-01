@@ -20,16 +20,20 @@ public class EdgeBlurEffect : MonoBehaviour
 
     Material mat;
 
+    static readonly int BlurStartId = Shader.PropertyToID("_BlurStart"), BlurEndId = Shader.PropertyToID("_BlurEnd"), BlurSizeId = Shader.PropertyToID("_BlurSize"),
+                        SideBiasId = Shader.PropertyToID("_SideBias"), VignetteId = Shader.PropertyToID("_Vignette"), SaturationId = Shader.PropertyToID("_Saturation"),
+                        DamageColorId = Shader.PropertyToID("_DamageColor"), DamageId = Shader.PropertyToID("_Damage");
+
     void OnRenderImage(RenderTexture src, RenderTexture dst)
     {
         if (shader == null) shader = Shader.Find("Hidden/ProjectGame/EdgeBlur");
         if (shader == null) { Graphics.Blit(src, dst); return; }
         if (mat == null) mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
         float low = health != null ? 1f - Mathf.Clamp01(health.Health / Mathf.Max(1f, health.maxHealth) * 2.5f) : 0f;   // stays red below 40 % health
-        mat.SetFloat("_BlurStart", blurStart); mat.SetFloat("_BlurEnd", blurEnd); mat.SetFloat("_BlurSize", blurSize);
-        mat.SetFloat("_SideBias", sideBias); mat.SetFloat("_Vignette", vignette); mat.SetFloat("_Saturation", saturation);
-        mat.SetColor("_DamageColor", damageColor);
-        mat.SetFloat("_Damage", health != null ? Mathf.Max(health.DamagePulse, low * 0.7f) : 0f);
+        mat.SetFloat(BlurStartId, blurStart); mat.SetFloat(BlurEndId, blurEnd); mat.SetFloat(BlurSizeId, blurSize);
+        mat.SetFloat(SideBiasId, sideBias); mat.SetFloat(VignetteId, vignette); mat.SetFloat(SaturationId, saturation);
+        mat.SetColor(DamageColorId, damageColor);
+        mat.SetFloat(DamageId, health != null ? Mathf.Max(health.DamagePulse, low * 0.7f) : 0f);
         Graphics.Blit(src, dst, mat);
     }
 

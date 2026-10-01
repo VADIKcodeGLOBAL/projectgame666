@@ -5,18 +5,20 @@ using UnityEngine;
 
 /// <summary>
 /// Small remote control for the open editor: write one command into Logs/EditorAutomation.trigger
-/// (refresh | koth | shots | playtest | model &lt;folder&gt;) and the editor runs it. Progress goes to Logs/EditorAutomation.log.
+/// (refresh | koth | shots | playtest | perftest | weapons | weapons-view | weapons-info | gameplay | supplies-view | model &lt;Assets folder&gt;)
+/// and the editor runs it. Progress goes to Logs/EditorAutomation.log. A command written during Play mode is dropped (only "stop" works there),
+/// so nothing runs by surprise later. Off switch: Tools > Automation > Accept Trigger File Commands.
 /// Also holds the shared Log and Shot helpers of the editor tools.
 /// </summary>
 [InitializeOnLoad]
-public static class EditorAutomation
+public static partial class EditorAutomation
 {
     const string LogPath = "Logs/EditorAutomation.log";
     const string TriggerPath = "Logs/EditorAutomation.trigger";
     public const string ShotDir = "Logs/shots";
     static double nextPoll;
 
-    const string PlayKey = "EditorAutomation.playtest", PlayAtKey = "EditorAutomation.playtestAt";
+    const string PlayKey = "EditorAutomation.playtest", PlayAtKey = "EditorAutomation.playtestAt", ModeKey = "EditorAutomation.mode";
     static int playPhase; static float playT;
 
     static EditorAutomation()
@@ -32,8 +34,9 @@ public static class EditorAutomation
         EditorApplication.playModeStateChanged += st => { if (st == PlayModeStateChange.EnteredEditMode) SessionState.SetBool(PlayKey, false); };
     }
 
-    static void ArmPlaytest()
+    static void ArmPlaytest(string mode = "playtest")
     {
+        SessionState.SetString(ModeKey, mode);
         SessionState.SetBool(PlayKey, true);
         SessionState.SetString(PlayAtKey, DateTime.UtcNow.ToOADate().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
         PlayerSettings.runInBackground = true;
@@ -58,6 +61,7 @@ public static class EditorAutomation
     static void PlayTick()
     {
         if (!EditorApplication.isPlaying) return;
+        if (SessionState.GetString(ModeKey, "playtest") == "perftest") { PerfTick(); return; }
         float t = Time.timeSinceLevelLoad;
         if (t < 1.5f) return;
         var game = WaveSurvivalGame.Instance;
@@ -352,8 +356,58 @@ public static class EditorAutomation
 
     public static void Log(string s)
     {
-        try { Directory.CreateDirectory("Logs"); File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss ") + s + "\n"); } catch { }
+        try
+        {
+            Directory.CreateDirectory("Logs");
+            var fi = new FileInfo(LogPath);
+            if (fi.Exists && fi.Length > MaxLogBytes) { File.Copy(LogPath, LogPath + ".old", true); File.Delete(LogPath); }   // keep the log from growing forever
+            File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss ") + s + "\n");
+        }
+        catch { }
         Debug.Log("[Tools] " + s);
+    }
+
+    // ---- the trigger file is a local back door into the editor: it can be switched off, and what it says is checked
+    const string EnabledPref = "EditorAutomation.enabled", MenuPath = "Tools/Automation/Accept Trigger File Commands";
+    const int MaxTriggerBytes = 512;
+    const long MaxLogBytes = 2 * 1024 * 1024;
+
+    static bool Enabled { get { return EditorPrefs.GetBool(EnabledPref, true); } }
+
+    [MenuItem(MenuPath)]
+    static void ToggleEnabled() { EditorPrefs.SetBool(EnabledPref, !Enabled); Debug.Log("[Tools] trigger file commands " + (Enabled ? "on" : "off")); }
+    [MenuItem(MenuPath, true)]
+    static bool ToggleEnabledCheck() { Menu.SetChecked(MenuPath, Enabled); return true; }
+
+    /// <summary>The command in the trigger file (deleted after reading); null if there is none, it is too big or it cannot be read yet.</summary>
+    static string ReadTrigger()
+    {
+        try
+        {
+            var fi = new FileInfo(TriggerPath);
+            if (!fi.Exists) return null;
+            if (fi.Length > MaxTriggerBytes) { File.Delete(TriggerPath); Log("trigger ignored: " + fi.Length + " bytes"); return null; }
+            string cmd = File.ReadAllText(TriggerPath).Trim();
+            File.Delete(TriggerPath);
+            return cmd;
+        }
+        catch (IOException) { return null; }                         // still being written: next poll
+        catch (UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>Printable ASCII only, at most 120 characters: the command goes into the log as it is.</summary>
+    static string Clean(string s)
+    {
+        var sb = new System.Text.StringBuilder(Math.Min(s.Length, 120));
+        foreach (char ch in s) { if (sb.Length >= 120) break; sb.Append(ch >= ' ' && ch < 127 ? ch : '?'); }
+        return sb.ToString();
+    }
+
+    /// <summary>"model" takes an existing folder inside Assets only: no absolute paths, no "..".</summary>
+    static bool IsAssetsFolder(string dir)
+    {
+        dir = dir.Replace('\\', '/').TrimEnd('/');
+        return dir.StartsWith("Assets/") && !dir.Contains("..") && !dir.Contains(":") && AssetDatabase.IsValidFolder(dir);
     }
 
     static void Tick()
@@ -361,27 +415,29 @@ public static class EditorAutomation
         double now = EditorApplication.timeSinceStartup;
         if (now < nextPoll) return;
         nextPoll = now + 0.5;
-        if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating || !Enabled) return;
         if (!File.Exists(TriggerPath)) return;
+        string cmd = ReadTrigger();
+        if (cmd == null) return;
         if (EditorApplication.isPlayingOrWillChangePlaymode)            // in Play mode only "stop" is accepted
         {
-            if (File.ReadAllText(TriggerPath).Trim() == "stop") { File.Delete(TriggerPath); Log("command: stop"); Stop(); }
+            if (cmd == "stop") { Log("command: stop"); Stop(); } else Log("ignored in Play mode: " + Clean(cmd));
             return;
         }
-        string cmd = File.ReadAllText(TriggerPath).Trim();
-        File.Delete(TriggerPath);
         Run(cmd);
     }
 
     static void Run(string cmd)
     {
-        Log("command: " + cmd);
+        Log("command: " + Clean(cmd));
+        if (cmd.StartsWith("model ") && !IsAssetsFolder(cmd.Substring(6).Trim())) { Log("ERROR model: the folder must exist inside Assets/"); return; }
         try
         {
             if (cmd == "refresh") { AssetDatabase.Refresh(); Log("REFRESH_OK"); }
             else if (cmd == "koth") KothMapGenerator.Generate(KothMapGenerator.LoadOrCreateSettings());
             else if (cmd == "shots") { KothMapGenerator.CheckShots(); Log("SHOTS_OK"); }
             else if (cmd == "playtest") { playPhase = 0; ArmPlaytest(); }
+            else if (cmd == "perftest") { perfPhase = 0; ArmPlaytest("perftest"); }
             else if (cmd == "weapons-info") WeaponSetup.Info();
             else if (cmd == "weapons") WeaponSetup.InstallInOpenScene();
             else if (cmd == "weapons-view") WeaponSetup.ViewShots();
