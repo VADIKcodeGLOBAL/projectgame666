@@ -1096,6 +1096,7 @@ public static class KothMapGenerator
         game.zone = zone; game.player = player.transform; game.botPrefab = MakeBotPrefab();
         game.spawnRadius = Mathf.Min(s.playRadius + 15f, half - 14f); game.mapHalfSize = half - 8f;
         var hud = gameGo.AddComponent<SurvivalHud>(); hud.game = game; hud.health = health; hud.weapons = weapons;
+        HudSetup.Build(hud);                                                      // the HUD canvas, visible in the editor
         SupplySetup.AddToGame(game);                                              // magazines, medkits, syringes; settings menu; music
         EditorAutomation.Log("  gameplay: " + s.waves + " waves x " + F1(s.waveDuration) + " s, " + s.mobsPerBatch + " bots x wave number every " + F1(s.batchInterval) + " s, bots appear " + F1(game.spawnRadius) + " m out, weapons: " + weapons.weapons.Length);
     }

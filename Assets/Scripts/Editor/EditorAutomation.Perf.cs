@@ -7,8 +7,23 @@ public static partial class EditorAutomation
     static int perfPhase, perfFrames, perfLastFrame;
     static float perfT;
     static double perfMain, perfMainMax, perfGc, perfScripts, perfLate, perfGui;
-    static ProfilerRecorder recMain, recGc, recScripts, recLate, recGui, recSep, recMove;
-    static double perfSep, perfMove;
+    static ProfilerRecorder recMain, recGc, recScripts, recLate, recGui, recSep, recMove, recCanvas, recOverlay;
+    static double perfSep, perfMove, perfCanvas, perfOverlay;
+
+    /// <summary>A recorder for a marker found by name in any category ("PlayerLoop", "UI Render" have no ProfilerCategory constant).</summary>
+    static ProfilerRecorder Any(string marker)
+    {
+        var handles = new System.Collections.Generic.List<Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle>();
+        Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle.GetAvailable(handles);
+        foreach (var h in handles)
+            if (Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle.GetDescription(h).Name == marker)
+            {
+                var r = new ProfilerRecorder(h, 1, ProfilerRecorderOptions.Default);
+                r.Start();
+                return r;
+            }
+        return default(ProfilerRecorder);
+    }
 
     static double Ms(ProfilerRecorder r) { return r.Valid ? r.LastValue / 1e6 : -1.0; }
 
@@ -52,7 +67,21 @@ public static partial class EditorAutomation
                 recGui = ProfilerRecorder.StartNew(ProfilerCategory.Gui, "GUI.Repaint");
                 recSep = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "EnemyBot.Separation");
                 recMove = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "EnemyBot.Move");
-                perfFrames = 0; perfMain = perfMainMax = perfGc = perfScripts = perfLate = perfGui = perfSep = perfMove = 0; perfLastFrame = Time.frameCount;
+                recCanvas = Any("PostLateUpdate.PlayerUpdateCanvases"); recOverlay = Any("UI.RenderOverlays");
+                if (!recCanvas.Valid || !recOverlay.Valid)                // list what the profiler offers for the canvases
+                {
+                    var handles = new System.Collections.Generic.List<Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle>();
+                    Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle.GetAvailable(handles);
+                    var sb = new System.Text.StringBuilder("  perftest canvas markers:");
+                    foreach (var hnd in handles)
+                    {
+                        var d = Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle.GetDescription(hnd);
+                        if (d.Name.IndexOf("Canvas", System.StringComparison.OrdinalIgnoreCase) >= 0 || d.Name.StartsWith("UGUI") || d.Name.StartsWith("UI."))
+                            sb.Append(" [" + d.Category.Name + "] " + d.Name + ";");
+                    }
+                    Log(sb.ToString());
+                }
+                perfFrames = 0; perfMain = perfMainMax = perfGc = perfScripts = perfLate = perfGui = perfSep = perfMove = perfCanvas = perfOverlay = 0; perfLastFrame = Time.frameCount;
                 perfPhase = 2; perfT = t; break;
             case 2:
                 if (Time.frameCount != perfLastFrame && recMain.Valid && recMain.LastValue > 0)
@@ -60,7 +89,7 @@ public static partial class EditorAutomation
                     perfLastFrame = Time.frameCount; perfFrames++;
                     double m = Ms(recMain); perfMain += m; if (m > perfMainMax) perfMainMax = m;
                     perfGc += recGc.Valid ? recGc.LastValue : 0; perfScripts += Ms(recScripts); perfLate += Ms(recLate); perfGui += Ms(recGui);
-                    perfSep += Ms(recSep); perfMove += Ms(recMove);
+                    perfSep += Ms(recSep); perfMove += Ms(recMove); perfCanvas += Ms(recCanvas); perfOverlay += Ms(recOverlay);
                 }
                 if (t < perfT + 3f) break;
                 int n = Mathf.Max(1, perfFrames);
@@ -68,8 +97,9 @@ public static partial class EditorAutomation
                 Log("  perftest " + EnemyBot.All.Count + " bots, " + perfFrames + " frames: main thread " + f2(perfMain / n) + " ms (max " + f2(perfMainMax) + "), "
                     + "Update " + (recScripts.Valid ? f2(perfScripts / n) + " ms" : "n/a") + ", LateUpdate " + (recLate.Valid ? f2(perfLate / n) + " ms" : "n/a")
                     + " (bots: separation " + (recSep.Valid ? f2(perfSep / n) + " ms" : "n/a") + ", CharacterController.Move " + (recMove.Valid ? f2(perfMove / n) + " ms" : "n/a") + ")"
-                    + ", OnGUI repaint " + (recGui.Valid ? f2(perfGui / n) + " ms" : "n/a") + ", garbage " + (recGc.Valid ? (perfGc / n / 1024.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " KB/frame" : "n/a"));
-                recMain.Dispose(); recGc.Dispose(); recScripts.Dispose(); recLate.Dispose(); recGui.Dispose(); recSep.Dispose(); recMove.Dispose();
+                    + ", OnGUI repaint " + (recGui.Valid ? f2(perfGui / n) + " ms" : "n/a")
+                    + ", canvas update " + (recCanvas.Valid ? f2(perfCanvas / n) + " ms" : "n/a") + ", canvas draw " + (recOverlay.Valid ? f2(perfOverlay / n) + " ms" : "n/a") + ", garbage " + (recGc.Valid ? (perfGc / n / 1024.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " KB/frame" : "n/a"));
+                recMain.Dispose(); recGc.Dispose(); recScripts.Dispose(); recLate.Dispose(); recGui.Dispose(); recSep.Dispose(); recMove.Dispose(); recCanvas.Dispose(); recOverlay.Dispose();
                 Log("PERFTEST_OK");
                 perfPhase = 3; Stop(); break;
         }

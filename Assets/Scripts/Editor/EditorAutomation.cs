@@ -443,6 +443,7 @@ public static partial class EditorAutomation
             else if (cmd == "weapons-view") WeaponSetup.ViewShots();
             else if (cmd == "gameplay") SupplySetup.InstallInOpenScene();
             else if (cmd == "supplies-view") SupplySetup.ViewShots();
+            else if (cmd == "hud") HudSetup.InstallInOpenScene();
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }
