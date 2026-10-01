@@ -1,0 +1,637 @@
+{
+ "name": "RavenWolf",
+ "height": 1.931,
+ "tris": 110506,
+ "verts": 70862,
+ "dims": [
+  0.973,
+  0.617,
+  1.931
+ ],
+ "materials": [
+  {
+   "name": "M_RavenWolf_Arm_Warmers",
+   "baseColor": "T_RavenWolf_Arm_Warmers_BaseColor.png",
+   "normal": "T_RavenWolf_Arm_Warmers_Normal.png",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.913,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Beanie",
+   "baseColor": "T_RavenWolf_Beanie_BaseColor.png",
+   "normal": "T_RavenWolf_Beanie_Normal.png",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.879,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Blush",
+   "baseColor": "T_RavenWolf_Blush_BaseColor.png",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.801,
+   "alpha": 1.0,
+   "alphaLinked": true,
+   "blend": true,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.095,
+   "alphaMin": 0.0
+  },
+  {
+   "name": "M_RavenWolf_BodyMAT",
+   "baseColor": "T_RavenWolf_BodyMAT_BaseColor.png",
+   "normal": "T_RavenWolf_BodyMAT_Normal.png",
+   "metallicSmoothness": "T_RavenWolf_BodyMAT_MetallicSmoothness.png",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.5,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0,
+   "linkedTo": [
+    [
+     "ShaderNodeSeparateColor",
+     "Color"
+    ]
+   ]
+  },
+  {
+   "name": "M_RavenWolf_Converse",
+   "baseColor": "T_RavenWolf_Converse_BaseColor.png",
+   "normal": "T_RavenWolf_Converse_Normal.png",
+   "metallicSmoothness": "T_RavenWolf_Converse_MetallicSmoothness.png",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.5,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0,
+   "linkedTo": [
+    [
+     "ShaderNodeSeparateColor",
+     "Color"
+    ]
+   ]
+  },
+  {
+   "name": "M_RavenWolf_Eyeglass",
+   "baseColor": "",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.0153,
+    0.0153,
+    0.0153,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.023,
+   "alpha": 0.108,
+   "alphaLinked": false,
+   "blend": true,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_FemaleUnderwear",
+   "baseColor": "T_RavenWolf_FemaleUnderwear_BaseColor.png",
+   "normal": "T_RavenWolf_FemaleUnderwear_Normal.png",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.801,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Glasses",
+   "baseColor": "",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.0143,
+    0.0143,
+    0.0143,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.102,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Hair",
+   "baseColor": "T_RavenWolf_Hair_BaseColor.png",
+   "normal": "T_RavenWolf_Hair_Normal.png",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.16,
+   "alpha": 1.0,
+   "alphaLinked": true,
+   "blend": true,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.153,
+   "alphaMin": 0.0
+  },
+  {
+   "name": "M_RavenWolf_HairClips",
+   "baseColor": "",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8008,
+    0.6951,
+    0.659,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.735,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Head",
+   "baseColor": "T_RavenWolf_Head_BaseColor.png",
+   "normal": "T_RavenWolf_Head_Normal.png",
+   "metallicSmoothness": "T_RavenWolf_Head_MetallicSmoothness.png",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.5,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0,
+   "linkedTo": [
+    [
+     "ShaderNodeSeparateColor",
+     "Color"
+    ]
+   ]
+  },
+  {
+   "name": "M_RavenWolf_Ipod",
+   "baseColor": "T_RavenWolf_Ipod_BaseColor.png",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "T_RavenWolf_Ipod_Emission.png",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.529,
+   "roughness": 0.041,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.899,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Material",
+   "baseColor": "",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 1.0,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Metal",
+   "baseColor": "",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.5137,
+    0.5137,
+    0.5137,
+    1.0
+   ],
+   "metallic": 1.0,
+   "roughness": 0.209,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Planti4Legs_MAT",
+   "baseColor": "T_RavenWolf_Planti4Legs_MAT_BaseColor.png",
+   "normal": "T_RavenWolf_Planti4Legs_MAT_Normal.png",
+   "metallicSmoothness": "T_RavenWolf_Planti4Legs_MAT_MetallicSmoothness.png",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.5,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0,
+   "linkedTo": [
+    [
+     "ShaderNodeSeparateColor",
+     "Color"
+    ]
+   ]
+  },
+  {
+   "name": "M_RavenWolf_Singlet",
+   "baseColor": "T_RavenWolf_Singlet_BaseColor.png",
+   "normal": "T_RavenWolf_Arm_Warmers_Normal.png",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.845,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Tail",
+   "baseColor": "T_RavenWolf_Tail_BaseColor.png",
+   "normal": "T_RavenWolf_Tail_Normal.png",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.498,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_ToonTeethMAT",
+   "baseColor": "T_RavenWolf_ToonTeethMAT_BaseColor.png",
+   "normal": "",
+   "metallicSmoothness": "T_RavenWolf_ToonTeethMAT_MetallicSmoothness.png",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.5,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0,
+   "linkedTo": [
+    [
+     "ShaderNodeSeparateColor",
+     "Color"
+    ]
+   ]
+  },
+  {
+   "name": "M_RavenWolf_CandyBracelet",
+   "baseColor": "T_RavenWolf_CandyBracelet_BaseColor.png",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.166,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  },
+  {
+   "name": "M_RavenWolf_Collar",
+   "baseColor": "T_RavenWolf_Collar_BaseColor.png",
+   "normal": "",
+   "metallicSmoothness": "T_RavenWolf_Collar_MetallicSmoothness.png",
+   "emission": "",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.5,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 0.0,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0,
+   "linkedTo": [
+    [
+     "ShaderNodeSeparateColor",
+     "Color"
+    ]
+   ]
+  },
+  {
+   "name": "M_RavenWolf_EyeMAT",
+   "baseColor": "T_RavenWolf_EyeMAT_BaseColor.png",
+   "normal": "",
+   "metallicSmoothness": "",
+   "emission": "T_RavenWolf_EyeMAT_Emission.png",
+   "color": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "metallic": 0.0,
+   "roughness": 0.719,
+   "alpha": 1.0,
+   "alphaLinked": false,
+   "blend": false,
+   "doubleSided": true,
+   "emissionStrength": 1.021,
+   "emissionColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "alphaSoft": 0.0,
+   "alphaMin": 1.0
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+﻿# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]serSettings/
+[Bb]uilds/
+[Mm]emoryCaptures/
+*.csproj
+*.sln
+*.slnx
+*.user
+*.pidb
+*.booproj
+*.unityproj
+.vs/
+.vscode/
+.idea/
+crashlytics-build.properties
+
+# Blender
+*.blend1
+*.blend2
+
+# misc
+*.tmp

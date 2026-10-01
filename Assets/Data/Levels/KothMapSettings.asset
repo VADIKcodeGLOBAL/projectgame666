@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f9ec72619552804c9e2136b9e470cef, type: 3}
+  m_Name: KothMapSettings
+  m_EditorClassIdentifier: Assembly-CSharp::KothMapSettings
+  seed: 7
+  mapSize: 600
+  playRadius: 235
+  maxHeight: 130
+  heightmapResolution: 513
+  baseLevel: 14
+  rimHeight: 52
+  hillRadius: 110
+  hillHeight: 34
+  plateauRadius: 13
+  cliffHeight: 0
+  routes: 4
+  teams: 2
+  spawnRadius: 190
+  pathHalfWidth: 1.8
+  captureRadius: 12
+  captureTime: 8
+  scoreToWin: 100
+  forestDensity: 0.5
+  treeBudget: 5200
+  scatteredRocks: 70
+  grassDensity: 0.8
+  lake: 1
+  lakeRadius: 34
+  backdrop: 1
+  backdropPeakHeight: 420
+  backdropRadius: 3000

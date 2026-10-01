@@ -1,0 +1,249 @@
+using System;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+/// <summary>
+/// Small remote control for the open editor: write one command into Logs/EditorAutomation.trigger
+/// (refresh | koth | shots | playtest | model &lt;folder&gt;) and the editor runs it. Progress goes to Logs/EditorAutomation.log.
+/// Also holds the shared Log and Shot helpers of the editor tools.
+/// </summary>
+[InitializeOnLoad]
+public static class EditorAutomation
+{
+    const string LogPath = "Logs/EditorAutomation.log";
+    const string TriggerPath = "Logs/EditorAutomation.trigger";
+    public const string ShotDir = "Logs/shots";
+    static double nextPoll;
+
+    const string PlayKey = "EditorAutomation.playtest", PlayAtKey = "EditorAutomation.playtestAt";
+    static int playPhase; static float playT;
+
+    static EditorAutomation()
+    {
+        EditorApplication.update += Tick;
+        if (SessionState.GetBool(PlayKey, false))
+        {
+            // only for the Play session started by the "playtest" command within the last two minutes, never for a session of the user
+            double at; bool fresh = double.TryParse(SessionState.GetString(PlayAtKey, ""), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out at)
+                                    && (DateTime.UtcNow - DateTime.FromOADate(at)).TotalSeconds < 120.0;
+            if (fresh) EditorApplication.update += PlayTick; else SessionState.SetBool(PlayKey, false);
+        }
+        EditorApplication.playModeStateChanged += st => { if (st == PlayModeStateChange.EnteredEditMode) SessionState.SetBool(PlayKey, false); };
+    }
+
+    static void ArmPlaytest()
+    {
+        SessionState.SetBool(PlayKey, true);
+        SessionState.SetString(PlayAtKey, DateTime.UtcNow.ToOADate().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        PlayerSettings.runInBackground = true;
+        EditorApplication.isPlaying = true;
+    }
+
+    // playtest state
+    static Vector3 runDir; static float tA, tB, landT, vRun, vAir, tl0, tl1, hp0, w1Health, w1Speed; static bool wasAir; static int spawnedAtWave2;
+
+    static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
+
+    static void Teleport(CharacterController cc, Vector3 p)
+    {
+        var t = Terrain.activeTerrain; if (t != null) p.y = t.SampleHeight(p) + t.transform.position.y + 0.3f;
+        cc.enabled = false; cc.transform.position = p; cc.enabled = true;
+    }
+
+    /// <summary>
+    /// Automatic test in Play mode (short timings): sprint survives a jump, progress stops outside the circle and resumes inside,
+    /// bots reach and hurt the player, wave 2 brings twice the batch and stronger bots. Saves Game view screenshots.
+    /// </summary>
+    static void PlayTick()
+    {
+        if (!EditorApplication.isPlaying) return;
+        float t = Time.timeSinceLevelLoad;
+        if (t < 1.5f) return;
+        var game = WaveSurvivalGame.Instance;
+        var fp = UnityEngine.Object.FindFirstObjectByType<SimpleFirstPersonController>();
+        if (game == null || fp == null || game.zone == null) { Log("PLAYTEST_FAILED: game, player or zone missing"); Stop(); return; }
+        var cc = fp.GetComponent<CharacterController>(); var hp = fp.GetComponent<PlayerHealth>();
+        Vector3 c = game.zone.transform.position;
+        if (t > 100f && playPhase < 9) { Log("PLAYTEST_FAILED: timeout in phase " + playPhase); playPhase = 9; playT = t; return; }
+
+        switch (playPhase)
+        {
+            case 0:
+                game.waveDuration = 16f; game.batchInterval = 6f; game.intermission = 3f;
+                runDir = Vector3.right;
+                Teleport(cc, c - runDir * 10f); fp.transform.rotation = Quaternion.LookRotation(runDir);
+                fp.SetTestInput(Vector3.forward, true, false);
+                Log("  playtest: short timings (wave 16 s, batch every 6 s); sprint test starts");
+                playPhase = 1; tA = t; break;
+            case 1:
+                if (t < tA + 0.8f) break;
+                vRun = fp.PlanarVelocity.magnitude;
+                fp.SetTestInput(Vector3.forward, true, true);                       // jump with Shift still held
+                playPhase = 2; tB = t; wasAir = false; landT = -1f; vAir = 0f; break;
+            case 2:
+                if (!fp.IsGrounded && t > tB + 0.05f) { wasAir = true; vAir = Mathf.Max(vAir, fp.PlanarVelocity.magnitude); }
+                if (wasAir && fp.IsGrounded && landT < 0f) landT = t;
+                if (landT > 0f && t > landT + 0.35f)
+                {
+                    float vAfter = fp.PlanarVelocity.magnitude, need = fp.sprintSpeed * 0.9f;
+                    Log("  playtest sprint: run " + F(vRun) + " m/s, in the air " + F(vAir) + ", after landing " + F(vAfter) + " (sprint " + F(fp.sprintSpeed) + ")");
+                    if (vRun < need || vAir < need || vAfter < need) { Log("PLAYTEST_FAILED: sprint is lost around the jump"); playPhase = 9; playT = t; break; }
+                    fp.ClearTestInput(); Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                    playPhase = 3;
+                }
+                else if (t > tB + 3f) { Log("PLAYTEST_FAILED: the jump did not land"); playPhase = 9; playT = t; }
+                break;
+            case 3:
+                if (game.State != WaveSurvivalGame.GameState.Wave || game.TimeLeft > game.waveDuration - 2f) break;
+                tl0 = game.TimeLeft; Teleport(cc, c + runDir * 40f); landT = 1f;
+                playPhase = 4; playT = t; break;
+            case 4:
+                if (t > playT + 2.5f && landT >= 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_paused.png"); landT = -1f; }   // one frame before the check
+                if (t < playT + 3f) break;
+                tl1 = game.TimeLeft;
+                Log("  playtest outside the circle for 3 s: timer " + F(tl0) + " -> " + F(tl1) + ", in zone " + game.InZone + ", bots alive " + game.Alive + ", spawned " + game.Spawned);
+                if (game.InZone || Mathf.Abs(tl1 - tl0) > 0.05f) { Log("PLAYTEST_FAILED: progress did not stop outside the circle"); playPhase = 9; playT = t; break; }
+                Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                playPhase = 5; playT = t; break;
+            case 5:
+                if (t < playT + 2f) break;
+                Log("  playtest back in the circle for 2 s: timer " + F(tl1) + " -> " + F(game.TimeLeft));
+                if (game.TimeLeft > tl1 - 1.5f && game.State == WaveSurvivalGame.GameState.Wave) { Log("PLAYTEST_FAILED: progress did not resume"); playPhase = 9; playT = t; break; }
+                if (EnemyBot.All.Count > 0) { w1Health = EnemyBot.All[0].maxHealth; w1Speed = EnemyBot.All[0].speed; }
+                int moved = 0;
+                foreach (var b in EnemyBot.All)
+                {
+                    if (moved >= 3) break;
+                    var bcc = b.GetComponent<CharacterController>(); bcc.enabled = false;
+                    b.transform.position = fp.transform.position + Quaternion.Euler(0f, moved * 120f, 0f) * Vector3.forward * 6f + Vector3.up * 1.5f;
+                    bcc.enabled = true; moved++;
+                }
+                hp0 = hp.Health; landT = -1f; playPhase = 6; playT = t; break;
+            case 6:
+                if (t > playT + 4.5f && landT < 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_fight.png"); landT = 1f; }
+                if (t < playT + 5f) break;
+                float near = 1e9f; foreach (var b in EnemyBot.All) near = Mathf.Min(near, Vector3.Distance(b.transform.position, fp.transform.position));
+                Log("  playtest melee: nearest bot " + F(near) + " m, hp " + F(hp0) + " -> " + F(hp.Health));
+                if (hp.Health >= hp0 && hp.Health >= hp.maxHealth) { Log("PLAYTEST_FAILED: bots did not hurt the player"); playPhase = 9; playT = t; break; }
+                for (int i = EnemyBot.All.Count - 1; i >= 0; i--)           // clear the melee test bots so the player survives to wave 2
+                    if (Vector3.Distance(EnemyBot.All[i].transform.position, fp.transform.position) < 12f) EnemyBot.All[i].TakeDamage(1e6f);
+                playPhase = 11; break;
+            case 11:                                                       // gun: the visible box is the hitbox, the rate of fire holds
+            {
+                var gun = fp.GetComponent<PlayerGun>();
+                EnemyBot tb = null; foreach (var b in EnemyBot.All) if (!b.IsDying && b.body != null) { tb = b; break; }
+                if (gun == null || tb == null) { Log("PLAYTEST_FAILED: no gun or no bot for the gun test"); playPhase = 9; playT = t; break; }
+                var bt = tb.body.transform; Vector3 fwd = bt.forward;
+                Vector3 corner = bt.TransformPoint(new Vector3(0.45f, 0.45f, 0f)) - fwd * 12f, beside = bt.TransformPoint(new Vector3(0.56f, 0.45f, 0f)) - fwd * 12f;
+                float d1 = 600f, d2 = 600f;
+                bool hitCorner = EnemyBot.RaycastBodies(corner, fwd, ref d1) == tb, hitBeside = EnemyBot.RaycastBodies(beside, fwd, ref d2) == tb;
+                bool capsuleCorner = Physics.Raycast(corner, fwd, 30f, 1 << 2, QueryTriggerInteraction.Ignore);
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                for (int i = 0; i < 2000; i++) { float d = 600f; EnemyBot.RaycastBodies(fp.transform.position + Vector3.up * 1.6f, UnityEngine.Random.onUnitSphere, ref d); }
+                double us = sw.Elapsed.TotalMilliseconds * 1000.0 / 2000.0;
+                Log("  playtest gun hitbox: top corner of the box " + (hitCorner ? "hit" : "MISSED") + " (old capsule: " + (capsuleCorner ? "hit" : "missed") + "), 6 cm beside the box " + (hitBeside ? "HIT" : "missed") + "; bot test " + us.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " us per round with " + EnemyBot.All.Count + " bots");
+                if (!hitCorner || hitBeside) { Log("PLAYTEST_FAILED: rounds do not follow the visible box"); playPhase = 9; playT = t; break; }
+                fp.cameraPivot.localRotation = Quaternion.Euler(-80f, 0f, 0f);  // into the sky: the burst hurts nobody
+                tl0 = gun.ShotsFired; gun.SetTestTrigger(true);
+                playPhase = 12; playT = t; landT = Time.frameCount; break;
+            }
+            case 12:
+            {
+                if (t < playT + 2f) break;
+                var gun = fp.GetComponent<PlayerGun>(); gun.ClearTestTrigger(); fp.cameraPivot.localRotation = Quaternion.identity;
+                float fired = gun.ShotsFired - tl0, secs = t - playT, fps = (Time.frameCount - landT) / secs, want = gun.shotsPerSecond * secs;
+                Log("  playtest gun rate: " + fired + " rounds in " + F(secs) + " s at " + F(fps) + " fps (want " + F(want) + ")");
+                if (Mathf.Abs(fired - want) > 1.5f) { Log("PLAYTEST_FAILED: rate of fire depends on the frame rate"); playPhase = 9; playT = t; break; }
+                playPhase = 7; break;
+            }
+            case 7:
+                if (game.Wave < 2 || game.State != WaveSurvivalGame.GameState.Wave) break;
+                spawnedAtWave2 = game.Spawned; playPhase = 8; playT = t; break;
+            case 8:
+                if (game.Spawned < spawnedAtWave2 + 3) break;
+                var nb = EnemyBot.All[EnemyBot.All.Count - 1];
+                Log("  playtest wave 2: batch " + game.BatchSize + " (wave 1: " + game.mobsPerBatch + "), new bot hp " + F(nb.maxHealth) + " (was " + F(w1Health) + "), speed " + F(nb.speed) + " (was " + F(w1Speed) + "), kills " + game.Kills + ", player hp " + F(hp.Health));
+                ScreenCapture.CaptureScreenshot(ShotDir + "/play_wave2.png");
+                Log(game.BatchSize == game.mobsPerBatch * 2 && nb.maxHealth > w1Health && nb.speed > w1Speed ? "PLAYTEST_OK" : "PLAYTEST_FAILED: wave 2 is not stronger");
+                playPhase = 9; playT = t; break;
+            case 9:
+                if (t > playT + 1.5f) { playPhase = 10; Stop(); }
+                break;
+        }
+    }
+
+    static void Stop()
+    {
+        SessionState.SetBool(PlayKey, false);
+        EditorApplication.update -= PlayTick;
+        EditorApplication.isPlaying = false;
+    }
+
+    public static void Log(string s)
+    {
+        try { Directory.CreateDirectory("Logs"); File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss ") + s + "\n"); } catch { }
+        Debug.Log("[Tools] " + s);
+    }
+
+    static void Tick()
+    {
+        double now = EditorApplication.timeSinceStartup;
+        if (now < nextPoll) return;
+        nextPoll = now + 0.5;
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+        if (!File.Exists(TriggerPath)) return;
+        if (EditorApplication.isPlayingOrWillChangePlaymode)            // in Play mode only "stop" is accepted
+        {
+            if (File.ReadAllText(TriggerPath).Trim() == "stop") { File.Delete(TriggerPath); Log("command: stop"); Stop(); }
+            return;
+        }
+        string cmd = File.ReadAllText(TriggerPath).Trim();
+        File.Delete(TriggerPath);
+        Run(cmd);
+    }
+
+    static void Run(string cmd)
+    {
+        Log("command: " + cmd);
+        try
+        {
+            if (cmd == "refresh") { AssetDatabase.Refresh(); Log("REFRESH_OK"); }
+            else if (cmd == "koth") KothMapGenerator.Generate(KothMapGenerator.LoadOrCreateSettings());
+            else if (cmd == "shots") { KothMapGenerator.CheckShots(); Log("SHOTS_OK"); }
+            else if (cmd == "playtest") { playPhase = 0; ArmPlaytest(); }
+            else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
+            else Log("unknown command");
+        }
+        catch (Exception e) { Log("ERROR " + e); EditorUtility.ClearProgressBar(); }
+    }
+
+    /// <summary>-executeMethod entry: queue the map generation, it starts once the editor is idle.</summary>
+    public static void GenerateKothFromCommandLine()
+    {
+        Directory.CreateDirectory("Logs");
+        File.WriteAllText(TriggerPath, "koth");
+    }
+
+    /// <summary>Renders the open scene from a point into Logs/shots/name.png (used to check results without touching the scene).</summary>
+    public static void Shot(string name, Vector3 pos, Vector3 target, float fov, bool edgeBlur = false)
+    {
+        const int W = 1600, H = 900;
+        var go = new GameObject("TMP_ShotCam") { hideFlags = HideFlags.HideAndDontSave };
+        var cam = go.AddComponent<Camera>();
+        cam.nearClipPlane = 0.2f; cam.farClipPlane = 8000f; cam.fieldOfView = fov;
+        if (edgeBlur) go.AddComponent<EdgeBlurEffect>().shader = Shader.Find("Hidden/ProjectGame/EdgeBlur");
+        go.transform.position = pos;
+        Vector3 dir = (target - pos).normalized;
+        go.transform.rotation = Quaternion.LookRotation(dir, Mathf.Abs(dir.y) > 0.98f ? Vector3.forward : Vector3.up);
+        var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+        cam.targetTexture = rt; cam.Render();
+        var prev = RenderTexture.active; RenderTexture.active = rt;
+        var tex = new Texture2D(W, H, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply();
+        RenderTexture.active = prev; cam.targetTexture = null;
+        Directory.CreateDirectory(ShotDir);
+        File.WriteAllBytes(ShotDir + "/" + name + ".png", tex.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(tex); rt.Release(); UnityEngine.Object.DestroyImmediate(rt); UnityEngine.Object.DestroyImmediate(go);
+    }
+}
