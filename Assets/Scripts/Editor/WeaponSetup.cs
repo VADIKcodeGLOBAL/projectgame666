@@ -22,7 +22,6 @@ public static class WeaponSetup
     public const string ModelDir = "Assets/Art/Weapons/Models";
     const string MatDir = "Assets/Art/Weapons/Materials";
     const string FxTexDir = "Assets/Art/Weapons/Textures";
-    const string PickupPath = "Assets/Prefabs/Weapons/AmmoPickup.prefab";
 
     class MatSpec
     {
@@ -149,9 +148,9 @@ public static class WeaponSetup
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
-    static Material FxMat(string name, Texture2D tex, Color tint, float intensity)
+    public static Material FxMat(string name, Texture2D tex, Color tint, float intensity, string dir = MatDir)
     {
-        string path = MatDir + "/" + name + ".mat";
+        EnsureFolder(dir); string path = dir + "/" + name + ".mat";
         var sh = Shader.Find("ProjectGame/MuzzleFlash");
         var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (mat == null) { mat = new Material(sh); AssetDatabase.CreateAsset(mat, path); } else mat.shader = sh;
@@ -160,9 +159,9 @@ public static class WeaponSetup
         return mat;
     }
 
-    static Material LitMat(string name, Color c, float metallic, float gloss, Color emission)
+    public static Material LitMat(string name, Color c, float metallic, float gloss, Color emission, string dir = MatDir)
     {
-        string path = MatDir + "/" + name + ".mat";
+        EnsureFolder(dir); string path = dir + "/" + name + ".mat";
         var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (mat == null) { mat = new Material(Shader.Find("Standard")); AssetDatabase.CreateAsset(mat, path); }
         mat.SetColor("_Color", c); mat.SetFloat("_Metallic", metallic); mat.SetFloat("_Glossiness", gloss);
@@ -171,9 +170,9 @@ public static class WeaponSetup
         return mat;
     }
 
-    class Fx { public Material fire, spark, beam; }
+    public class Fx { public Material fire, spark, beam; }
 
-    static Fx MakeFx()
+    public static Fx MakeFx()
     {
         EnsureFolder(MatDir);
         var fx = new Fx();
@@ -326,42 +325,6 @@ public static class WeaponSetup
         return inv;
     }
 
-    // ------------------------------------------------------------------ ammo pickup
-    public static AmmoPickup AmmoPickupPrefab()
-    {
-        var fx = MakeFx();
-        EnsureFolder(Path.GetDirectoryName(PickupPath).Replace('\\', '/'));
-        var body = LitMat("M_AmmoMagazine", new Color(0.09f, 0.09f, 0.10f), 0.6f, 0.45f, new Color(0.10f, 0.06f, 0.01f));
-        var brass = LitMat("M_AmmoBrass", new Color(0.85f, 0.62f, 0.25f), 1f, 0.7f, new Color(0.55f, 0.35f, 0.08f));
-
-        var root = new GameObject("AmmoPickup");
-        var pick = root.AddComponent<AmmoPickup>();
-        var spin = new GameObject("Magazine").transform; spin.SetParent(root.transform, false); spin.localScale = Vector3.one * 1.6f;
-        Action<string, Vector3, Vector3, Vector3, Material> part = (name, pos, rot, size, mat) =>
-        {
-            var g = GameObject.CreatePrimitive(PrimitiveType.Cube); g.name = name;
-            Object.DestroyImmediate(g.GetComponent<Collider>());
-            g.transform.SetParent(spin, false); g.transform.localPosition = pos; g.transform.localRotation = Quaternion.Euler(rot); g.transform.localScale = size;
-            var r = g.GetComponent<MeshRenderer>(); r.sharedMaterial = mat; r.shadowCastingMode = ShadowCastingMode.Off;
-        };
-        part("Lower", new Vector3(0f, -0.07f, 0.012f), new Vector3(14f, 0f, 0f), new Vector3(0.035f, 0.13f, 0.075f), body);   // a curved rifle magazine
-        part("Upper", new Vector3(0f, 0.05f, 0f), Vector3.zero, new Vector3(0.035f, 0.12f, 0.075f), body);
-        part("Rounds", new Vector3(0f, 0.118f, 0f), Vector3.zero, new Vector3(0.022f, 0.018f, 0.065f), brass);
-        for (int k = 0; k < 2; k++)                                                   // a soft upright glow, seen over the grass
-        {
-            var q = GameObject.CreatePrimitive(PrimitiveType.Quad); q.name = "Glow" + k;
-            Object.DestroyImmediate(q.GetComponent<Collider>());
-            q.transform.SetParent(root.transform, false);
-            q.transform.localPosition = new Vector3(0f, -pick.hoverHeight + 1.1f, 0f); q.transform.localRotation = Quaternion.Euler(0f, k * 90f, 0f);
-            q.transform.localScale = new Vector3(0.35f, 2.2f, 1f);
-            var r = q.GetComponent<MeshRenderer>(); r.sharedMaterial = fx.beam; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
-        }
-        pick.spinner = spin;
-        var prefab = PrefabUtility.SaveAsPrefabAsset(root, PickupPath);
-        Object.DestroyImmediate(root);
-        return prefab.GetComponent<AmmoPickup>();
-    }
-
     // ------------------------------------------------------------------ editor commands
     /// <summary>"weapons": replaces the weapons of the player in the hill level with freshly built ones and saves the scene.</summary>
     public static void InstallInOpenScene()
@@ -378,7 +341,7 @@ public static class WeaponSetup
 
         var invNew = BuildPlayerWeapons(player, cam);
         var hud = Object.FindFirstObjectByType<SurvivalHud>(); if (hud != null) { hud.weapons = invNew; EditorUtility.SetDirty(hud); }
-        var game = Object.FindFirstObjectByType<WaveSurvivalGame>(); if (game != null) { game.ammoPickupPrefab = AmmoPickupPrefab(); EditorUtility.SetDirty(game); }
+        var game = Object.FindFirstObjectByType<WaveSurvivalGame>(); if (game != null) { game.ammoPickupPrefab = SupplySetup.Ammo(); EditorUtility.SetDirty(game); }
         EditorSceneManager.MarkSceneDirty(scene);
         bool saved = EditorSceneManager.SaveScene(scene);
         AssetDatabase.SaveAssets();

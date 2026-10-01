@@ -39,7 +39,8 @@ public class WeaponInventory : MonoBehaviour
     {
         Instance = this;
         fp = GetComponent<SimpleFirstPersonController>();
-        if (cam != null) baseFov = cam.fieldOfView;
+        baseFov = GameSettings.Fov;
+        if (cam != null) cam.fieldOfView = baseFov;
         if (weapons == null) weapons = new Weapon[0];
         for (int i = 0; i < weapons.Length; i++) { weapons[i].Init(this); weapons[i].gameObject.SetActive(i == CurrentIndex); }
         if (audioSource != null)
@@ -109,11 +110,12 @@ public class WeaponInventory : MonoBehaviour
         }
         else raise = Mathf.MoveTowards(raise, 1f, Time.deltaTime / halfSwitch);
 
+        baseFov = GameSettings.Fov;                                        // from the settings menu
         bool aiming = aimHeld && w.hasScope && !w.IsReloading && pending < 0 && raise > 0.99f;
         Aim = Mathf.MoveTowards(Aim, aiming ? 1f : 0f, Time.deltaTime / Mathf.Max(0.01f, scopeTime));
         if (cam != null)
         {
-            cam.fieldOfView = w.hasScope ? Mathf.Lerp(baseFov, w.scopeFov, Aim * Aim) : Mathf.MoveTowards(cam.fieldOfView, baseFov, Time.deltaTime * 400f);
+            cam.fieldOfView = w.hasScope ? Mathf.Lerp(baseFov, w.scopeFov, Aim * Aim) : baseFov;      // FOV slider shows at once, also in the pause menu
             if (fp != null) fp.lookScale = cam.fieldOfView / baseFov;         // the same mouse move turns the view less when zoomed in
         }
 
@@ -134,7 +136,7 @@ public class WeaponInventory : MonoBehaviour
         {
             var a = voicePool[nextVoice]; nextVoice = (nextVoice + 1) % voicePool.Length;
             a.Stop(); a.clip = w.shotClips[Random.Range(0, w.shotClips.Length)];
-            a.pitch = w.shotPitch * Random.Range(0.95f, 1.05f); a.volume = w.shotVolume; a.Play();
+            a.pitch = w.shotPitch * Random.Range(0.95f, 1.05f); a.volume = w.shotVolume * GameSettings.ShotVolume; a.Play();
         }
     }
 

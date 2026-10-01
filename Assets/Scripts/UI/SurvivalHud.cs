@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// HUD of the wave survival mode: wave timer, next batch, bots alive, health, ammo (rounds and spare magazines, bottom left),
-/// weapon slots, score, crosshair or the sniper scope, warnings and end screens.
+/// HUD of the wave survival mode: wave timer, next batch, bots alive, health and the speed boost, ammo (rounds and spare
+/// magazines, bottom left), weapon slots, score, supplies picked up, crosshair or the sniper scope, warnings and end screens.
 /// </summary>
 public class SurvivalHud : MonoBehaviour
 {
@@ -11,6 +11,7 @@ public class SurvivalHud : MonoBehaviour
     public WeaponInventory weapons;
 
     GUIStyle mid, big, huge, small, ammoBig, ammoSmall, slot;
+    SimpleFirstPersonController fp;
     Texture2D scopeTex;
 
     static void Box(Rect r, Color c) { GUI.color = c; GUI.DrawTexture(r, Texture2D.whiteTexture); GUI.color = Color.white; }
@@ -72,6 +73,17 @@ public class SurvivalHud : MonoBehaviour
         }
         else if (w.InMagazine == 0)
             Shadowed(new Rect(x + 12f, y + 88f, 260f, 18f), w.HasSpare ? "R - RELOAD" : "NO AMMO - FIND MAGAZINES", small, new Color(1f, 0.4f, 0.3f));
+    }
+
+    /// <summary>Speed syringe: a bar that runs down next to the health bar.</summary>
+    void DrawBoost(float h)
+    {
+        if (fp == null && health != null) fp = health.GetComponent<SimpleFirstPersonController>();
+        if (fp == null || fp.BoostTimeLeft <= 0f) return;
+        float k = fp.BoostTimeLeft / Mathf.Max(0.01f, fp.BoostDuration);
+        Box(new Rect(316f, h - 50f, 150f, 26f), new Color(0f, 0f, 0f, 0.55f));
+        Box(new Rect(318f, h - 48f, 146f * k, 22f), new Color(0.25f, 0.95f, 0.8f, 0.9f));
+        Shadowed(new Rect(316f, h - 50f, 150f, 26f), "SPEED " + fp.BoostTimeLeft.ToString("0.0") + " s", slot, Color.white);
     }
 
     void DrawSlots(float w, float h)
@@ -151,9 +163,15 @@ public class SurvivalHud : MonoBehaviour
         DrawAmmo(h);
         DrawSlots(w, h);
         Shadowed(new Rect(w - 324f, h - 52f, 300f, 28f), "KILLS " + game.Kills, mid, Color.white);
-        GUI.Label(new Rect(24f, h - 22f, 1200f, 20f), "LMB - capture mouse / fire    R - reload    RMB - scope    1-4 / wheel - weapon    WASD - move    Shift - sprint    Space - jump    Esc - release mouse", small);
-        if (weapons != null && Time.time - weapons.PickupTime < 1.6f)
-            Shadowed(new Rect(0f, h * 0.62f, w, 28f), weapons.PickupText, mid, new Color(1f, 0.85f, 0.4f, 1f - Mathf.Clamp01((Time.time - weapons.PickupTime - 1.1f) / 0.5f)));
+        GUI.Label(new Rect(24f, h - 22f, 1200f, 20f), "LMB - capture mouse / fire    R - reload    RMB - scope    1-4 / wheel - weapon    WASD - move    Shift - sprint    Space - jump    Esc - menu / settings", small);
+        float since = Time.time - SupplyPickup.LastTime;
+        if (since < 1.8f)
+        {
+            Color pc = SupplyPickup.LastKind == SupplyPickup.Kind.Medkit ? new Color(1f, 0.45f, 0.4f) : SupplyPickup.LastKind == SupplyPickup.Kind.Speed ? new Color(0.4f, 1f, 0.85f) : new Color(1f, 0.85f, 0.4f);
+            pc.a = 1f - Mathf.Clamp01((since - 1.3f) / 0.5f);
+            Shadowed(new Rect(0f, h * 0.62f, w, 28f), SupplyPickup.LastMessage, mid, pc);
+        }
+        DrawBoost(h);
 
         // ---- crosshair and hit marker
         if (!game.IsOver && !scoped)

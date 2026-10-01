@@ -41,7 +41,7 @@ public static class EditorAutomation
     }
 
     // playtest state
-    static Vector3 runDir; static float tA, tB, landT, vRun, vAir, tl0, tl1, hp0, w1Health, w1Speed; static bool wasAir; static int spawnedAtWave2, moveIdx, ownBlocked, ownTicks; static float[] hitRates = new float[3];
+    static Vector3 runDir; static float tA, tB, landT, vRun, vAir, tl0, tl1, hp0, w1Health, w1Speed; static bool wasAir; static int spawnedAtWave2, moveIdx, ownBlocked, ownTicks, moveTicks, groundTicks; static float speedSum; static bool jumpedOk; static Vector3 startPos, endPos; static float[] hitRates = new float[3];
 
     static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
 
@@ -172,15 +172,30 @@ public static class EditorAutomation
                 Log("  playtest reload: " + F(t - hp0) + " s (set " + F(ak.reloadTime) + "), magazine " + ak.InMagazine + "/" + ak.magazineSize + ", spare rounds " + tl1 + " -> " + ak.Reserve + " (magazines " + ak.Magazines + ")");
                 if (ak.InMagazine != ak.magazineSize || tl1 - ak.Reserve != ak.magazineSize) { Log("PLAYTEST_FAILED: the reload did not move one magazine"); playPhase = 9; playT = t; break; }
                 tl1 = ak.Magazines;
-                AmmoPickup.Spawn(game.ammoPickupPrefab, fp.transform.position + fp.transform.forward * 0.5f);
+                SupplyPickup.Spawn(game.ammoPickupPrefab, fp.transform.position + fp.transform.forward * 0.5f);
                 playPhase = 15; playT = t; break;
             }
-            case 15:                                                       // walk into a magazine
+            case 15:                                                       // walk into a magazine, then a medkit and a syringe
             {
                 if (t < playT + 0.6f) break;
                 var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
-                Log("  playtest pickup: magazines " + tl1 + " -> " + ak.Magazines + " (" + inv.PickupText + "), pickup prefab " + (game.ammoPickupPrefab != null));
+                Log("  playtest pickup: magazines " + tl1 + " -> " + ak.Magazines + " (" + SupplyPickup.LastMessage + "), pickup prefab " + (game.ammoPickupPrefab != null));
                 if (ak.Magazines != tl1 + 1) { Log("PLAYTEST_FAILED: the magazine was not picked up"); playPhase = 9; playT = t; break; }
+                if (game.medkitPrefab == null || game.speedPrefab == null) { Log("PLAYTEST_FAILED: medkit or syringe prefab missing"); playPhase = 9; playT = t; break; }
+                if (hp.Health > 60f) hp.TakeDamage(hp.Health - 50f);           // room for the medkit
+                hp0 = hp.Health; fp.ClearSpeedBoost();
+                SupplyPickup.Spawn(game.medkitPrefab, fp.transform.position + fp.transform.right * 0.5f);
+                SupplyPickup.Spawn(game.speedPrefab, fp.transform.position - fp.transform.right * 0.5f);
+                playPhase = 24; playT = t; break;
+            }
+            case 24:
+            {
+                if (t < playT + 0.6f) break;
+                var inv = fp.GetComponent<WeaponInventory>();
+                float want = Mathf.Min(hp.maxHealth, hp0 + game.medkitPrefab.heal);
+                Log("  playtest medkit: hp " + F(hp0) + " -> " + F(hp.Health) + " (want " + F(want) + "); syringe: speed x" + F(fp.SpeedMultiplier) + " for " + F(fp.BoostTimeLeft) + " s more");
+                if (Mathf.Abs(hp.Health - want) > 0.5f || fp.SpeedMultiplier <= 1f || fp.BoostTimeLeft <= 0f) { Log("PLAYTEST_FAILED: medkit or syringe did nothing"); playPhase = 9; playT = t; break; }
+                fp.ClearSpeedBoost(); hp.Heal(hp.maxHealth);                   // the rest of the test at full health and normal speed
                 inv.Select(3); playPhase = 16; playT = t; break;
             }
             case 16:                                                       // sniper: the scope comes up and zooms in
@@ -250,6 +265,48 @@ public static class EditorAutomation
                 if (++moveIdx < 3) { Teleport(cc, c - runDir * 2f); playT = t; break; }
                 tb.Die(false); inv.ClearTestInput(); fp.Pitch = 0f; Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
                 if (Mathf.Min(hitRates[0], Mathf.Min(hitRates[1], hitRates[2])) < 0.9f) { Log("PLAYTEST_FAILED: rounds miss a target in the crosshair while moving"); playPhase = 9; playT = t; break; }
+                playPhase = 21; break;
+            }
+            case 21:                                                       // movement: sprint down the hill side, then up it
+            {
+                fp.ClearSpeedBoost();
+                Teleport(cc, c + runDir * 16f); fp.transform.rotation = Quaternion.LookRotation(runDir);
+                fp.SetTestInput(Vector3.forward, true, false);
+                moveTicks = 0; groundTicks = 0; speedSum = 0f; jumpedOk = false; startPos = fp.transform.position;
+                playPhase = 22; playT = t; landT = -1f; break;
+            }
+            case 22:
+            {
+                if (landT < 0f && t > playT + 0.3f)
+                {
+                    if (moveTicks == 0) { startPos = fp.transform.position; tl1 = t; }  // measured after the speed-up
+                    moveTicks++; if (fp.IsGrounded) groundTicks++;
+                }
+                if (landT < 0f && t > playT + 1.3f)                        // jump on the way down
+                {
+                    endPos = fp.transform.position; speedSum = t - tl1;
+                    fp.SetTestInput(Vector3.forward, true, true); landT = t; break;
+                }
+                if (landT > 0f && !fp.IsGrounded && fp.VerticalVelocity > 1f) jumpedOk = true;
+                if (landT < 0f || t < landT + 0.6f) break;
+                float horiz = Vector2.Distance(new Vector2(startPos.x, startPos.z), new Vector2(endPos.x, endPos.z));
+                float grade = (startPos.y - endPos.y) / Mathf.Max(0.1f, horiz) * 100f, onGround = groundTicks / (float)Mathf.Max(1, moveTicks), v = horiz / Mathf.Max(0.01f, speedSum);
+                Log("  playtest downhill: grade ~" + F(grade) + " %, on the ground " + F(onGround * 100f) + " % of ticks, speed over the ground " + F(v) + " m/s (sprint " + F(fp.sprintSpeed) + "), jump " + (jumpedOk ? "done" : "MISSING"));
+                if (onGround < 0.95f || v < fp.sprintSpeed * 0.93f || v > fp.sprintSpeed * 1.05f || !jumpedOk) { Log("PLAYTEST_FAILED: running downhill is not the same as on the flat"); playPhase = 9; playT = t; break; }
+                Teleport(cc, c + runDir * 34f); fp.transform.rotation = Quaternion.LookRotation(-runDir);
+                fp.SetTestInput(Vector3.forward, true, false);
+                moveTicks = 0; speedSum = 0f; startPos = fp.transform.position;
+                playPhase = 23; playT = t; break;
+            }
+            case 23:
+            {
+                if (t > playT + 0.3f && moveTicks == 0) { startPos = fp.transform.position; tl1 = t; moveTicks = 1; }
+                if (t < playT + 1.3f) break;
+                float horiz = Vector2.Distance(new Vector2(startPos.x, startPos.z), new Vector2(fp.transform.position.x, fp.transform.position.z));
+                float v = horiz / Mathf.Max(0.01f, t - tl1), grade = (fp.transform.position.y - startPos.y) / Mathf.Max(0.1f, horiz) * 100f;
+                Log("  playtest uphill: grade ~" + F(grade) + " %, speed over the ground " + F(v) + " m/s (" + F(horiz) + " m in " + F(t - tl1) + " s), planar velocity " + F(fp.PlanarVelocity.magnitude));
+                fp.ClearTestInput(); Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                if (v < fp.sprintSpeed * 0.93f) { Log("PLAYTEST_FAILED: running uphill is slower than on the flat"); playPhase = 9; playT = t; break; }
                 playPhase = 7; break;
             }
             case 7:
@@ -310,6 +367,8 @@ public static class EditorAutomation
             else if (cmd == "weapons-info") WeaponSetup.Info();
             else if (cmd == "weapons") WeaponSetup.InstallInOpenScene();
             else if (cmd == "weapons-view") WeaponSetup.ViewShots();
+            else if (cmd == "gameplay") SupplySetup.InstallInOpenScene();
+            else if (cmd == "supplies-view") SupplySetup.ViewShots();
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }
