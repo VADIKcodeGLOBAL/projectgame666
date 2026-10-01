@@ -57,6 +57,7 @@ public class Weapon : MonoBehaviour
     public bool ReserveFull { get { return infiniteReserve || Reserve >= maxMagazines * magazineSize; } }
     public bool HasSpare { get { return infiniteReserve || Reserve > 0; } }
 
+    static readonly RaycastHit[] hitBuffer = new RaycastHit[16];
     Vector3 restPos; Quaternion restRot; Vector3 magRest; Renderer[] modelRenderers, magRenderers;
     float nextShot, lastShot = -10f, reloadStart, effectOff, kickAmount, lightIntensity;
     bool modelVisible = true, magVisible = true;
@@ -89,6 +90,9 @@ public class Weapon : MonoBehaviour
         if (!infiniteReserve) { take = Mathf.Min(take, Reserve); Reserve -= take; }
         InMagazine += take; IsReloading = false;
     }
+
+    /// <summary>A full magazine at once, no reload (tests and scripted events).</summary>
+    public void FillMagazine() { InMagazine = magazineSize; IsReloading = false; }
 
     /// <summary>A picked-up magazine; false when the pouch is full.</summary>
     public bool AddMagazine()
@@ -129,8 +133,15 @@ public class Weapon : MonoBehaviour
             Vector2 s = Random.insideUnitCircle * spreadDeg;
             Vector3 dir = cam.transform.rotation * (Quaternion.Euler(s.y, s.x, 0f) * Vector3.forward);
             Vector3 origin = cam.transform.position;
-            float dist = range; RaycastHit rh;
-            if (Physics.Raycast(origin, dir, out rh, range, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) dist = rh.distance;
+            float dist = range;
+            int n = Physics.RaycastNonAlloc(origin, dir, hitBuffer, range, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                // not our own body: the player's capsule is moved for queries only at the next physics step, so when
+                // sprinting backwards it trails in front of the camera and used to swallow every round
+                if (Owner != null && hitBuffer[i].collider.transform.IsChildOf(Owner.transform)) continue;
+                if (hitBuffer[i].distance < dist) dist = hitBuffer[i].distance;
+            }
             var bot = EnemyBot.RaycastBodies(origin, dir, ref dist);
             if (bot != null) { bot.TakeDamage(damage); hit = true; }
         }

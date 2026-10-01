@@ -10,7 +10,8 @@ using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// Builds the player's weapons from the models in Assets/Art/Weapons/Models/source (AK-47, MP5, 10mm pistol, sniper rifle;
+/// Builds the player's weapons from the low-poly models in Assets/Art/Weapons/Models/LowPoly (AK-47, MP5, 10mm pistol, sniper rifle;
+/// made from Models/source by Source/Blender/Scripts/weapon_decimate.py: 5000 triangles per long gun, 3000 for the pistol;
 /// the portal gun and the cannon are not used yet): texture import settings, materials (ProjectGame/WeaponPBR), material remap
 /// on the FBX, real-world size and barrel along +Z, the muzzle point found on the mesh, muzzle fire quad, flash light and sparks.
 /// Also makes the ammo pickup prefab. Called by the hill map generator and by the editor commands
@@ -48,7 +49,7 @@ public static class WeaponSetup
     static readonly Spec[] Specs =
     {
         new Spec {
-            id = "AK47", fbx = "source/ak-47/ak-47.fbx", modelRot = new Vector3(0f, 90f, 0f), length = 0.88f,
+            id = "AK47", fbx = "LowPoly/AK47_LP.fbx", modelRot = new Vector3(0f, 90f, 0f), length = 0.88f,
             viewPos = new Vector3(0.155f, -0.165f, 0.40f), fireSize = 0.24f,
             mats = new[] {
                 new MatSpec("Wood_ak-47", "source/ak-47", "Wood_ak-47_Base_Color.png", "Wood_ak-47_OpenGL.png", "Wood_ak-47_Metallic.png", "Wood_ak-47_Roughness.png", "Wood_ak-47_AO.png"),
@@ -57,7 +58,7 @@ public static class WeaponSetup
                            w.magazineSize = 30; w.startMagazines = 4; w.maxMagazines = 8; w.reloadTime = 2.4f; w.recoil = 0.35f;
                            w.kick = new Vector3(0f, 0.008f, -0.04f); w.kickPitch = 2.5f; w.shotPitch = 1f; w.shotVolume = 0.55f; w.sparksPerRound = 6; } },
         new Spec {
-            id = "MP5", fbx = "source/MP5/MP5.fbx", length = 0.66f, muzzleMesh = "Barrel_low", magazinePart = "Mag_low",
+            id = "MP5", fbx = "LowPoly/MP5_LP.fbx", length = 0.66f, muzzleMesh = "Barrel_low", magazinePart = "Mag_low",
             viewPos = new Vector3(0.15f, -0.155f, 0.36f), fireSize = 0.17f,
             mats = new[] {
                 new MatSpec("low", "source/MP5", "MP5_BaseColor.png", "MP5_Normal.png", "MP5_Metallic.png", "MP5_Roughness.png", null, "MP5_Emissive.png"),
@@ -66,14 +67,14 @@ public static class WeaponSetup
                            w.magazineSize = 30; w.startMagazines = 5; w.maxMagazines = 10; w.reloadTime = 2.0f; w.recoil = 0.22f;
                            w.kick = new Vector3(0f, 0.005f, -0.03f); w.kickPitch = 1.8f; w.shotPitch = 1.18f; w.shotVolume = 0.45f; w.sparksPerRound = 4; } },
         new Spec {
-            id = "Pistol10mm", fbx = "source/Gun 10mm/Gun 10mm.fbx", length = 0.205f, magazinePart = "Magazine",
+            id = "Pistol10mm", fbx = "LowPoly/Pistol10mm_LP.fbx", length = 0.205f, magazinePart = "Magazine",
             viewPos = new Vector3(0.12f, -0.115f, 0.30f), fireSize = 0.13f, lightRange = 3f,
             mats = new[] { new MatSpec("Gun", "source/Gun 10mm/Textures", "Gun_BaseColor.png", "Gun_Normal.png", "Gun_Metallic.png", "Gun_Roughness.png") },
             stats = w => { w.displayName = "10mm"; w.mode = Weapon.FireMode.Semi; w.damage = 34f; w.roundsPerSecond = 6f; w.spread = 0.5f;
                            w.magazineSize = 15; w.infiniteReserve = true; w.maxMagazines = 0; w.reloadTime = 1.4f; w.recoil = 0.6f;
                            w.kick = new Vector3(0f, 0.012f, -0.035f); w.kickPitch = 7f; w.shotPitch = 1.3f; w.shotVolume = 0.5f; w.sparksPerRound = 4; } },
         new Spec {
-            id = "Sniper", fbx = "source/sniper.fbx", length = 1.25f, magazinePart = "mag",
+            id = "Sniper", fbx = "LowPoly/Sniper_LP.fbx", length = 1.25f, magazinePart = "mag",
             viewPos = new Vector3(0.16f, -0.17f, 0.46f), fireSize = 0.34f, lightRange = 5f,
             mats = new[] { new MatSpec("sniper", "textures", "sniperColor.png", "sniperNormal.png", "sniperMetallic.png", "sniperRoughness.png", "sniperAO.png") },
             stats = w => { w.displayName = "Sniper"; w.mode = Weapon.FireMode.Semi; w.damage = 400f; w.roundsPerSecond = 0.75f; w.spread = 3f; w.scopedSpread = 0f;

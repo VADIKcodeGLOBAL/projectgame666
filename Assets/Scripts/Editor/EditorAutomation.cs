@@ -41,7 +41,7 @@ public static class EditorAutomation
     }
 
     // playtest state
-    static Vector3 runDir; static float tA, tB, landT, vRun, vAir, tl0, tl1, hp0, w1Health, w1Speed; static bool wasAir; static int spawnedAtWave2;
+    static Vector3 runDir; static float tA, tB, landT, vRun, vAir, tl0, tl1, hp0, w1Health, w1Speed; static bool wasAir; static int spawnedAtWave2, moveIdx, ownBlocked, ownTicks; static float[] hitRates = new float[3];
 
     static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
 
@@ -211,6 +211,45 @@ public static class EditorAutomation
                 if (t > playT + 0.25f && landT < 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_fire.png"); landT = 1f; }
                 if (t < playT + 0.4f) break;
                 inv.ClearTestInput(); fp.Pitch = 0f;
+                // a target bot that stands still 14 m ahead, for hits while standing, sprinting backwards and walking backwards
+                Teleport(cc, c - runDir * 2f); fp.transform.rotation = Quaternion.LookRotation(runDir);
+                var tgt = UnityEngine.Object.Instantiate(game.botPrefab, c + runDir * 12f, Quaternion.LookRotation(-runDir));
+                tgt.Init(fp.transform, 1e7f, 0f, 0f, 1f, Color.white); tgt.name = "TestTarget";
+                moveIdx = 0; landT = -1f; playPhase = 20; playT = t; break;
+            }
+            case 20:                                                       // aim at the target every tick; 1.5 s per movement
+            {
+                var inv = fp.GetComponent<WeaponInventory>();
+                var tgt = GameObject.Find("TestTarget"); EnemyBot tb = tgt != null ? tgt.GetComponent<EnemyBot>() : null;
+                if (tb == null) { Log("PLAYTEST_FAILED: test target lost"); playPhase = 9; playT = t; break; }
+                Vector3 d = tb.body.transform.position - inv.cam.transform.position;
+                fp.transform.rotation = Quaternion.LookRotation(new Vector3(d.x, 0f, d.z));
+                fp.Pitch = -Mathf.Asin(d.y / d.magnitude) * Mathf.Rad2Deg;
+                if (t < playT + 0.3f) break;                               // settle, then measure
+                if (landT < 0f)
+                {
+                    Vector3[] moves = { Vector3.zero, Vector3.back, Vector3.back };
+                    bool[] sprint = { false, true, false };
+                    fp.SetTestInput(moves[moveIdx], sprint[moveIdx], false); inv.SetTestInput(true, false);
+                    inv.Current.FillMagazine();                            // 30 rounds: no reload inside the 1.5 s run
+                    tl0 = inv.ShotsFired; tl1 = inv.Hits; landT = t; break;
+                }
+                if (t < landT + 1.5f)
+                {
+                    RaycastHit own;                                        // how often the player's own capsule is in front of the camera
+                    ownTicks++;
+                    if (Physics.Raycast(inv.cam.transform.position, d.normalized, out own, 30f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) && own.collider.gameObject == fp.gameObject) ownBlocked++;
+                    break;
+                }
+                string[] names = { "standing", "sprinting backwards", "walking backwards" };
+                float shots = inv.ShotsFired - tl0, hits = inv.Hits - tl1;
+                Log("  playtest hits " + names[moveIdx] + ": " + hits + " / " + shots + " at " + F(fp.PlanarVelocity.magnitude) + " m/s, target " + F(d.magnitude) + " m; own capsule in front of the camera " + ownBlocked + " of " + ownTicks + " ticks");
+                ownBlocked = 0; ownTicks = 0;
+                hitRates[moveIdx] = shots > 0 ? hits / shots : 0f;
+                inv.SetTestInput(false, false); fp.ClearTestInput(); landT = -1f;
+                if (++moveIdx < 3) { Teleport(cc, c - runDir * 2f); playT = t; break; }
+                tb.Die(false); inv.ClearTestInput(); fp.Pitch = 0f; Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                if (Mathf.Min(hitRates[0], Mathf.Min(hitRates[1], hitRates[2])) < 0.9f) { Log("PLAYTEST_FAILED: rounds miss a target in the crosshair while moving"); playPhase = 9; playT = t; break; }
                 playPhase = 7; break;
             }
             case 7:

@@ -67,7 +67,12 @@ WASD, Shift — бег, Space — прыжок, Esc — отпустить мы�
 9. **BuildLighting** — солнце, луна, цикл дня и ночи, небо.
 10. **BuildGameplay** — зона, игрок с оружием (`WeaponSetup`) и эффектом камеры, префабы бота и магазина, игра волн и HUD.
 
-Оружие собирает `Scripts/Editor/WeaponSetup.cs` из моделей `Assets/Art/Weapons/Models/source`: материалы `ProjectGame/WeaponPBR`
+Модели оружия облегчены скриптом `Source/Blender/Scripts/weapon_decimate.py` (Blender, decimate с сохранением UV, те же текстуры)
+до бюджета вида от первого лица: 5000 треугольников на автомат / ПП / винтовку, 3000 на пистолет
+(AK-47 14 553 → 4 999, MP5 14 248 → 4 992, 10mm 15 274 → 3 009, Sniper 13 087 → 4 994). Результат — `Assets/Art/Weapons/Models/LowPoly`,
+оригиналы остаются в `Models/source`.
+
+Оружие собирает `Scripts/Editor/WeaponSetup.cs` из моделей `Assets/Art/Weapons/Models/LowPoly`: материалы `ProjectGame/WeaponPBR`
 (отдельные карты metallic / roughness / AO), реальный размер, ствол по +Z, точка дула по вершинам меша, огонь из дула
 (`ProjectGame/MuzzleFlash` с текстурой из `Assets/Art/Weapons/Textures`, каждый выстрел повёрнут на случайный угол), вспышка света, искры.
 Пересобрать оружие в готовой сцене без перегенерации карты — команда `weapons` (`Logs/EditorAutomation.trigger`),
