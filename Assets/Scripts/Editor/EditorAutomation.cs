@@ -317,8 +317,26 @@ public static class EditorAutomation
                 var nb = EnemyBot.All[EnemyBot.All.Count - 1];
                 Log("  playtest wave 2: batch " + game.BatchSize + " (wave 1: " + game.mobsPerBatch + "), new bot hp " + F(nb.maxHealth) + " (was " + F(w1Health) + "), speed " + F(nb.speed) + " (was " + F(w1Speed) + "), kills " + game.Kills + ", player hp " + F(hp.Health));
                 ScreenCapture.CaptureScreenshot(ShotDir + "/play_wave2.png");
-                Log(game.BatchSize == game.mobsPerBatch * 2 && nb.maxHealth > w1Health && nb.speed > w1Speed ? "PLAYTEST_OK" : "PLAYTEST_FAILED: wave 2 is not stronger");
+                if (!(game.BatchSize == game.mobsPerBatch * 2 && nb.maxHealth > w1Health && nb.speed > w1Speed)) { Log("PLAYTEST_FAILED: wave 2 is not stronger"); playPhase = 9; playT = t; break; }
+                var sm = UnityEngine.Object.FindFirstObjectByType<SettingsMenu>();
+                if (sm == null) { Log("PLAYTEST_FAILED: no settings menu"); playPhase = 9; playT = t; break; }
+                sm.Open(); playPhase = 25; playT = Time.realtimeSinceStartup; break;
+            case 25:                                                       // settings menu: pauses the game, shows, closes
+            {
+                if (Time.realtimeSinceStartup < playT + 0.5f) break;
+                ScreenCapture.CaptureScreenshot(ShotDir + "/play_settings.png");   // taken at the end of this frame, with the menu up
+                playPhase = 26; playT = Time.realtimeSinceStartup; break;
+            }
+            case 26:
+            {
+                if (Time.realtimeSinceStartup < playT + 0.4f) break;
+                var menu = UnityEngine.Object.FindFirstObjectByType<SettingsMenu>();
+                bool paused = Time.timeScale == 0f && SettingsMenu.IsOpen && Cursor.lockState != CursorLockMode.Locked;
+                menu.Close();
+                Log("  playtest settings menu: paused " + paused + ", resumed " + (Time.timeScale == 1f && !SettingsMenu.IsOpen) + ", fov " + F(GameSettings.Fov) + ", volumes " + F(GameSettings.MasterVolume) + "/" + F(GameSettings.MusicVolume) + "/" + F(GameSettings.ShotVolume) + ", music tracks " + menu.music.TrackCount);
+                Log(paused && Time.timeScale == 1f ? "PLAYTEST_OK" : "PLAYTEST_FAILED: the settings menu does not pause and resume");
                 playPhase = 9; playT = t; break;
+            }
             case 9:
                 if (t > playT + 1.5f) { playPhase = 10; Stop(); }
                 break;
