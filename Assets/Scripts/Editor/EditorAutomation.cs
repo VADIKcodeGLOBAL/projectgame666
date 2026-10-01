@@ -124,7 +124,8 @@ public static class EditorAutomation
                 if (t > playT + 4.5f && landT < 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_fight.png"); landT = 1f; }
                 if (t < playT + 5f) break;
                 float near = 1e9f; foreach (var b in EnemyBot.All) near = Mathf.Min(near, Vector3.Distance(b.transform.position, fp.transform.position));
-                Log("  playtest melee: nearest bot " + F(near) + " m, hp " + F(hp0) + " -> " + F(hp.Health));
+                var pg = fp.GetComponent<PlayerGun>();
+                Log("  playtest melee: nearest bot " + F(near) + " m, hp " + F(hp0) + " -> " + F(hp.Health) + ", kills " + game.Kills + ", rounds fired " + (pg != null ? pg.ShotsFired : -1) + ", cursor " + Cursor.lockState);
                 if (hp.Health >= hp0 && hp.Health >= hp.maxHealth) { Log("PLAYTEST_FAILED: bots did not hurt the player"); playPhase = 9; playT = t; break; }
                 for (int i = EnemyBot.All.Count - 1; i >= 0; i--)           // clear the melee test bots so the player survives to wave 2
                     if (Vector3.Distance(EnemyBot.All[i].transform.position, fp.transform.position) < 12f) EnemyBot.All[i].TakeDamage(1e6f);
