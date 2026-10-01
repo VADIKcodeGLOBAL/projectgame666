@@ -1,15 +1,90 @@
 using UnityEngine;
 
-/// <summary>HUD of the wave survival mode: wave timer, next batch, bots alive, health, score, crosshair, warnings and end screens.</summary>
+/// <summary>
+/// HUD of the wave survival mode: wave timer, next batch, bots alive, health, ammo (rounds and spare magazines, bottom left),
+/// weapon slots, score, crosshair or the sniper scope, warnings and end screens.
+/// </summary>
 public class SurvivalHud : MonoBehaviour
 {
     public WaveSurvivalGame game;
     public PlayerHealth health;
-    public PlayerGun gun;
+    public WeaponInventory weapons;
 
-    GUIStyle mid, big, huge, small;
+    GUIStyle mid, big, huge, small, ammoBig, ammoSmall, slot;
+    Texture2D scopeTex;
 
     static void Box(Rect r, Color c) { GUI.color = c; GUI.DrawTexture(r, Texture2D.whiteTexture); GUI.color = Color.white; }
+
+    /// <summary>Scope picture: black outside the lens, a darker rim inside it, thin cross hairs with thick outer posts and mil dots.</summary>
+    static Texture2D MakeScope(int n)
+    {
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+        var px = new Color32[n * n];
+        float c = (n - 1) * 0.5f, lens = n * 0.49f, px1 = n / 1024f;
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float dx = x - c, dy = y - c, d = Mathf.Sqrt(dx * dx + dy * dy);
+                float a = Mathf.Clamp01((d - lens) / (2f * px1));                              // outside the lens
+                a = Mathf.Max(a, Mathf.Pow(Mathf.Clamp01((d - lens * 0.80f) / (lens * 0.20f)), 2.2f) * 0.85f);   // rim shadow
+                float ax = Mathf.Abs(dx), ay = Mathf.Abs(dy);
+                bool post = (ay < 5f * px1 && ax > lens * 0.55f) || (ax < 5f * px1 && ay > lens * 0.55f);
+                bool hair = (ay < 1.2f * px1 && ax > 10f * px1) || (ax < 1.2f * px1 && ay > 10f * px1);
+                bool dot = false;
+                for (int k = 1; k <= 4 && !dot; k++)
+                {
+                    float m = k * lens * 0.11f, r = 3.2f * px1;
+                    dot = (Mathf.Abs(ax - m) < r && ay < r) || (Mathf.Abs(ay - m) < r && ax < r);
+                }
+                if ((post || hair || dot) && d < lens) a = 1f;
+                px[y * n + x] = new Color32(0, 0, 0, (byte)(a * 255f));
+            }
+        tex.SetPixels32(px); tex.Apply();
+        return tex;
+    }
+
+    void DrawAmmo(float h)
+    {
+        var w = weapons != null ? weapons.Current : null;
+        if (w == null) return;
+        float x = 24f, y = h - 164f;
+        Box(new Rect(x, y, 284f, 108f), new Color(0f, 0f, 0f, 0.45f));
+        Shadowed(new Rect(x + 12f, y + 4f, 260f, 22f), w.displayName.ToUpperInvariant(), ammoSmall, new Color(1f, 0.85f, 0.4f));
+
+        // rounds in the magazine / magazine size
+        Color rc = w.InMagazine == 0 ? new Color(1f, 0.3f, 0.2f) : w.InMagazine <= Mathf.Max(1, w.magazineSize / 4) ? new Color(1f, 0.7f, 0.3f) : Color.white;
+        Shadowed(new Rect(x + 12f, y + 22f, 110f, 46f), w.InMagazine.ToString(), ammoBig, rc);
+        Shadowed(new Rect(x + 96f, y + 38f, 80f, 26f), "/ " + w.magazineSize, ammoSmall, new Color(0.85f, 0.85f, 0.85f));
+
+        // spare magazines: one icon each, and the number
+        int mags = w.Magazines;
+        Shadowed(new Rect(x + 168f, y + 24f, 110f, 22f), "MAGAZINES", ammoSmall, new Color(0.85f, 0.85f, 0.85f));
+        Shadowed(new Rect(x + 168f, y + 42f, 110f, 30f), mags < 0 ? "x ∞" : "x " + mags, mid, mags == 0 ? new Color(1f, 0.3f, 0.2f) : Color.white);
+        if (mags > 0)
+            for (int i = 0; i < w.maxMagazines; i++)
+                Box(new Rect(x + 12f + i * 13f, y + 72f, 9f, 14f), i < mags ? new Color(1f, 0.85f, 0.4f, 0.95f) : new Color(1f, 1f, 1f, 0.15f));
+
+        if (w.IsReloading)
+        {
+            Box(new Rect(x + 12f, y + 94f, 170f, 6f), new Color(0f, 0f, 0f, 0.6f));
+            Box(new Rect(x + 12f, y + 94f, 170f * w.ReloadProgress, 6f), new Color(1f, 0.85f, 0.4f));
+            Shadowed(new Rect(x + 190f, y + 88f, 90f, 18f), "RELOADING", small, Color.white);
+        }
+        else if (w.InMagazine == 0)
+            Shadowed(new Rect(x + 12f, y + 88f, 260f, 18f), w.HasSpare ? "R - RELOAD" : "NO AMMO - FIND MAGAZINES", small, new Color(1f, 0.4f, 0.3f));
+    }
+
+    void DrawSlots(float w, float h)
+    {
+        if (weapons == null || weapons.weapons == null) return;
+        float x = w - 324f, y = h - 84f, cw = 300f / Mathf.Max(1, weapons.weapons.Length);
+        for (int i = 0; i < weapons.weapons.Length; i++)
+        {
+            bool cur = i == weapons.CurrentIndex;
+            Box(new Rect(x + i * cw, y, cw - 4f, 24f), cur ? new Color(1f, 0.85f, 0.4f, 0.35f) : new Color(0f, 0f, 0f, 0.35f));
+            Shadowed(new Rect(x + i * cw, y, cw - 4f, 24f), (i + 1) + " " + weapons.weapons[i].displayName, slot, cur ? Color.white : new Color(0.75f, 0.75f, 0.75f));
+        }
+    }
 
     static void Shadowed(Rect r, string text, GUIStyle st, Color c)
     {
@@ -30,8 +105,22 @@ public class SurvivalHud : MonoBehaviour
             big = new GUIStyle(mid) { fontSize = 44 };
             huge = new GUIStyle(mid) { fontSize = 64 };
             small = new GUIStyle(GUI.skin.label) { fontSize = 13 };
+            ammoBig = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            ammoSmall = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            slot = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         }
         float w = Screen.width, h = Screen.height, cx = w * 0.5f;
+
+        // ---- sniper scope: under the rest of the HUD
+        bool scoped = weapons != null && weapons.IsScoped && !game.IsOver;
+        if (scoped)
+        {
+            if (scopeTex == null) scopeTex = MakeScope(1024);
+            float s = h, left = cx - s * 0.5f;
+            GUI.DrawTexture(new Rect(left, 0f, s, s), scopeTex);
+            Box(new Rect(0f, 0f, left + 1f, h), Color.black); Box(new Rect(left + s - 1f, 0f, w - left - s + 1f, h), Color.black);
+            if (Time.time - weapons.LastHitTime < 0.15f) Box(new Rect(cx - 3f, h * 0.5f - 3f, 6f, 6f), new Color(1f, 0.3f, 0.2f));
+        }
 
         // ---- top: wave and timer
         if (game.State == WaveSurvivalGame.GameState.Wave)
@@ -59,13 +148,17 @@ public class SurvivalHud : MonoBehaviour
             Box(new Rect(26f, h - 48f, 280f * Mathf.Clamp01(k), 22f), Color.Lerp(new Color(0.9f, 0.15f, 0.1f), new Color(0.3f, 0.9f, 0.35f), k));
             Shadowed(new Rect(24f, h - 50f, 284f, 26f), "HP " + Mathf.CeilToInt(health.Health), mid, Color.white);
         }
+        DrawAmmo(h);
+        DrawSlots(w, h);
         Shadowed(new Rect(w - 324f, h - 52f, 300f, 28f), "KILLS " + game.Kills, mid, Color.white);
-        GUI.Label(new Rect(24f, h - 22f, 900f, 20f), "LMB - capture mouse / fire    WASD - move    Shift - sprint    Space - jump    Esc - release mouse", small);
+        GUI.Label(new Rect(24f, h - 22f, 1200f, 20f), "LMB - capture mouse / fire    R - reload    RMB - scope    1-4 / wheel - weapon    WASD - move    Shift - sprint    Space - jump    Esc - release mouse", small);
+        if (weapons != null && Time.time - weapons.PickupTime < 1.6f)
+            Shadowed(new Rect(0f, h * 0.62f, w, 28f), weapons.PickupText, mid, new Color(1f, 0.85f, 0.4f, 1f - Mathf.Clamp01((Time.time - weapons.PickupTime - 1.1f) / 0.5f)));
 
         // ---- crosshair and hit marker
-        if (!game.IsOver)
+        if (!game.IsOver && !scoped)
         {
-            Color cc = gun != null && Time.time - gun.LastHitTime < 0.12f ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 1f, 1f, 0.85f);
+            Color cc = weapons != null && Time.time - weapons.LastHitTime < 0.12f ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 1f, 1f, 0.85f);
             Box(new Rect(cx - 9f, h * 0.5f - 1f, 6f, 2f), cc); Box(new Rect(cx + 3f, h * 0.5f - 1f, 6f, 2f), cc);
             Box(new Rect(cx - 1f, h * 0.5f - 9f, 2f, 6f), cc); Box(new Rect(cx - 1f, h * 0.5f + 3f, 2f, 6f), cc);
         }

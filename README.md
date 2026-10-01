@@ -25,7 +25,7 @@ Library/ Temp/ Logs/ UserSettings/   служебные папки Unity, в .gi
 | Сгенерированные ассеты (террейн, слои, камни, фон) | `Assets/Art/Environment/KingOfTheHill/` |
 | Игра волн, боты, зона | `Assets/Scripts/Core/WaveSurvivalGame.cs`, `Assets/Scripts/AI/EnemyBot.cs`, `Assets/Scripts/Level/HillZone.cs` |
 | День и ночь | `Assets/Scripts/Level/DayNightCycle.cs`, шейдер `Assets/Shaders/SkyDayNight.shader` |
-| Игрок, оружие, HUD, эффект камеры | `Assets/Scripts/Player/`, `Assets/Scripts/Weapons/PlayerGun.cs`, `Assets/Scripts/UI/SurvivalHud.cs`, `Assets/Scripts/Core/EdgeBlurEffect.cs` |
+| Игрок, оружие, HUD, эффект камеры | `Assets/Scripts/Player/`, `Assets/Scripts/Weapons/` (`Weapon`, `WeaponInventory`, `AmmoPickup`; сборка — `Assets/Scripts/Editor/WeaponSetup.cs`), `Assets/Scripts/UI/SurvivalHud.cs`, `Assets/Scripts/Core/EdgeBlurEffect.cs` |
 | Префаб бота | `Assets/Prefabs/Enemies/EnemyBot_Box.prefab` |
 | Шейдеры | `Assets/Shaders/` — небо, боты, зона, вода, листва, эффект камеры, двусторонний PBR, вершинный цвет |
 ## Модели

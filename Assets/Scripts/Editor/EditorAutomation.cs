@@ -65,7 +65,7 @@ public static class EditorAutomation
         if (game == null || fp == null || game.zone == null) { Log("PLAYTEST_FAILED: game, player or zone missing"); Stop(); return; }
         var cc = fp.GetComponent<CharacterController>(); var hp = fp.GetComponent<PlayerHealth>();
         Vector3 c = game.zone.transform.position;
-        if (t > 100f && playPhase < 9) { Log("PLAYTEST_FAILED: timeout in phase " + playPhase); playPhase = 9; playT = t; return; }
+        if (t > 120f && playPhase != 9 && playPhase != 10) { Log("PLAYTEST_FAILED: timeout in phase " + playPhase); playPhase = 9; playT = t; return; }
 
         switch (playPhase)
         {
@@ -124,17 +124,17 @@ public static class EditorAutomation
                 if (t > playT + 4.5f && landT < 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_fight.png"); landT = 1f; }
                 if (t < playT + 5f) break;
                 float near = 1e9f; foreach (var b in EnemyBot.All) near = Mathf.Min(near, Vector3.Distance(b.transform.position, fp.transform.position));
-                var pg = fp.GetComponent<PlayerGun>();
+                var pg = fp.GetComponent<WeaponInventory>();
                 Log("  playtest melee: nearest bot " + F(near) + " m, hp " + F(hp0) + " -> " + F(hp.Health) + ", kills " + game.Kills + ", rounds fired " + (pg != null ? pg.ShotsFired : -1) + ", cursor " + Cursor.lockState);
                 if (hp.Health >= hp0 && hp.Health >= hp.maxHealth) { Log("PLAYTEST_FAILED: bots did not hurt the player"); playPhase = 9; playT = t; break; }
                 for (int i = EnemyBot.All.Count - 1; i >= 0; i--)           // clear the melee test bots so the player survives to wave 2
                     if (Vector3.Distance(EnemyBot.All[i].transform.position, fp.transform.position) < 12f) EnemyBot.All[i].TakeDamage(1e6f);
                 playPhase = 11; break;
-            case 11:                                                       // gun: the visible box is the hitbox, the rate of fire holds
+            case 11:                                                       // weapons: the visible box is the hitbox, the rate of fire holds
             {
-                var gun = fp.GetComponent<PlayerGun>();
+                var inv = fp.GetComponent<WeaponInventory>();
                 EnemyBot tb = null; foreach (var b in EnemyBot.All) if (!b.IsDying && b.body != null) { tb = b; break; }
-                if (gun == null || tb == null) { Log("PLAYTEST_FAILED: no gun or no bot for the gun test"); playPhase = 9; playT = t; break; }
+                if (inv == null || inv.weapons.Length < 4 || tb == null) { Log("PLAYTEST_FAILED: no weapons or no bot for the weapon test"); playPhase = 9; playT = t; break; }
                 var bt = tb.body.transform; Vector3 fwd = bt.forward;
                 Vector3 corner = bt.TransformPoint(new Vector3(0.45f, 0.45f, 0f)) - fwd * 12f, beside = bt.TransformPoint(new Vector3(0.56f, 0.45f, 0f)) - fwd * 12f;
                 float d1 = 600f, d2 = 600f;
@@ -145,17 +145,72 @@ public static class EditorAutomation
                 double us = sw.Elapsed.TotalMilliseconds * 1000.0 / 2000.0;
                 Log("  playtest gun hitbox: top corner of the box " + (hitCorner ? "hit" : "MISSED") + " (old capsule: " + (capsuleCorner ? "hit" : "missed") + "), 6 cm beside the box " + (hitBeside ? "HIT" : "missed") + "; bot test " + us.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " us per round with " + EnemyBot.All.Count + " bots");
                 if (!hitCorner || hitBeside) { Log("PLAYTEST_FAILED: rounds do not follow the visible box"); playPhase = 9; playT = t; break; }
-                fp.cameraPivot.localRotation = Quaternion.Euler(-80f, 0f, 0f);  // into the sky: the burst hurts nobody
-                tl0 = gun.ShotsFired; gun.SetTestTrigger(true);
+                fp.Pitch = -80f;                                           // into the sky: the bursts hurt nobody
+                tl0 = inv.ShotsFired; tl1 = inv.Current.InMagazine; inv.SetTestInput(true, false);
                 playPhase = 12; playT = t; landT = Time.frameCount; break;
             }
-            case 12:
+            case 12:                                                       // AK-47 held for 2 s: 20 rounds, 20 fewer in the magazine
             {
                 if (t < playT + 2f) break;
-                var gun = fp.GetComponent<PlayerGun>(); gun.ClearTestTrigger(); fp.cameraPivot.localRotation = Quaternion.identity;
-                float fired = gun.ShotsFired - tl0, secs = t - playT, fps = (Time.frameCount - landT) / secs, want = gun.shotsPerSecond * secs;
-                Log("  playtest gun rate: " + fired + " rounds in " + F(secs) + " s at " + F(fps) + " fps (want " + F(want) + ")");
-                if (Mathf.Abs(fired - want) > 1.5f) { Log("PLAYTEST_FAILED: rate of fire depends on the frame rate"); playPhase = 9; playT = t; break; }
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                float fired = inv.ShotsFired - tl0, secs = t - playT, fps = (Time.frameCount - landT) / secs, want = ak.roundsPerSecond * secs;
+                Log("  playtest " + ak.displayName + " rate: " + fired + " rounds in " + F(secs) + " s at " + F(fps) + " fps (want " + F(want) + "), magazine " + tl1 + " -> " + ak.InMagazine);
+                if (Mathf.Abs(fired - want) > 1.5f || tl1 - ak.InMagazine != fired) { Log("PLAYTEST_FAILED: rate of fire or ammo count is off"); playPhase = 9; playT = t; break; }
+                tl1 = ak.Reserve; playPhase = 13; playT = t; break;        // keep holding: the magazine runs dry and reloads by itself
+            }
+            case 13:
+            {
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                if (ak.IsReloading) { inv.SetTestInput(false, false); hp0 = t; playPhase = 14; break; }
+                if (t > playT + 3f) { Log("PLAYTEST_FAILED: an empty magazine did not start a reload (in magazine " + ak.InMagazine + ")"); playPhase = 9; playT = t; }
+                break;
+            }
+            case 14:
+            {
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                if (ak.IsReloading) { if (t > hp0 + ak.reloadTime + 1f) { Log("PLAYTEST_FAILED: the reload never ends"); playPhase = 9; playT = t; } break; }
+                Log("  playtest reload: " + F(t - hp0) + " s (set " + F(ak.reloadTime) + "), magazine " + ak.InMagazine + "/" + ak.magazineSize + ", spare rounds " + tl1 + " -> " + ak.Reserve + " (magazines " + ak.Magazines + ")");
+                if (ak.InMagazine != ak.magazineSize || tl1 - ak.Reserve != ak.magazineSize) { Log("PLAYTEST_FAILED: the reload did not move one magazine"); playPhase = 9; playT = t; break; }
+                tl1 = ak.Magazines;
+                AmmoPickup.Spawn(game.ammoPickupPrefab, fp.transform.position + fp.transform.forward * 0.5f);
+                playPhase = 15; playT = t; break;
+            }
+            case 15:                                                       // walk into a magazine
+            {
+                if (t < playT + 0.6f) break;
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                Log("  playtest pickup: magazines " + tl1 + " -> " + ak.Magazines + " (" + inv.PickupText + "), pickup prefab " + (game.ammoPickupPrefab != null));
+                if (ak.Magazines != tl1 + 1) { Log("PLAYTEST_FAILED: the magazine was not picked up"); playPhase = 9; playT = t; break; }
+                inv.Select(3); playPhase = 16; playT = t; break;
+            }
+            case 16:                                                       // sniper: the scope comes up and zooms in
+            {
+                var inv = fp.GetComponent<WeaponInventory>();
+                if (inv.IsSwitching) { if (t > playT + 2f) { Log("PLAYTEST_FAILED: weapon switch hangs"); playPhase = 9; playT = t; } break; }
+                fp.Pitch = 0f; inv.SetTestInput(false, true); playPhase = 17; playT = t; landT = -1f; break;
+            }
+            case 17:
+            {
+                var inv = fp.GetComponent<WeaponInventory>();
+                if (t > playT + 0.5f && landT < 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_scope.png"); landT = 1f; }
+                if (t < playT + 0.6f) break;
+                Log("  playtest scope: " + inv.Current.displayName + ", scoped " + inv.IsScoped + ", fov " + F(inv.cam.fieldOfView) + " (scope " + F(inv.Current.scopeFov) + "), look scale " + F(fp.lookScale));
+                if (!inv.IsScoped || Mathf.Abs(inv.cam.fieldOfView - inv.Current.scopeFov) > 0.5f) { Log("PLAYTEST_FAILED: no zoom through the scope"); playPhase = 9; playT = t; break; }
+                inv.SetTestInput(false, false); inv.Select(0); playPhase = 18; playT = t; break;
+            }
+            case 18:                                                       // AK-47 again: a burst at the horizon for the muzzle fire picture
+            {
+                var inv = fp.GetComponent<WeaponInventory>();
+                if (inv.IsSwitching || inv.Aim > 0f) { if (t > playT + 2f) { Log("PLAYTEST_FAILED: switch back hangs"); playPhase = 9; playT = t; } break; }
+                Log("  playtest switch back: fov " + F(inv.cam.fieldOfView) + ", weapon " + inv.Current.displayName);
+                inv.SetTestInput(true, false); playPhase = 19; playT = t; landT = -1f; break;
+            }
+            case 19:
+            {
+                var inv = fp.GetComponent<WeaponInventory>();
+                if (t > playT + 0.25f && landT < 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_fire.png"); landT = 1f; }
+                if (t < playT + 0.4f) break;
+                inv.ClearTestInput(); fp.Pitch = 0f;
                 playPhase = 7; break;
             }
             case 7:
@@ -213,6 +268,9 @@ public static class EditorAutomation
             else if (cmd == "koth") KothMapGenerator.Generate(KothMapGenerator.LoadOrCreateSettings());
             else if (cmd == "shots") { KothMapGenerator.CheckShots(); Log("SHOTS_OK"); }
             else if (cmd == "playtest") { playPhase = 0; ArmPlaytest(); }
+            else if (cmd == "weapons-info") WeaponSetup.Info();
+            else if (cmd == "weapons") WeaponSetup.InstallInOpenScene();
+            else if (cmd == "weapons-view") WeaponSetup.ViewShots();
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }
@@ -227,12 +285,12 @@ public static class EditorAutomation
     }
 
     /// <summary>Renders the open scene from a point into Logs/shots/name.png (used to check results without touching the scene).</summary>
-    public static void Shot(string name, Vector3 pos, Vector3 target, float fov, bool edgeBlur = false)
+    public static void Shot(string name, Vector3 pos, Vector3 target, float fov, bool edgeBlur = false, float near = 0.2f)
     {
         const int W = 1600, H = 900;
         var go = new GameObject("TMP_ShotCam") { hideFlags = HideFlags.HideAndDontSave };
         var cam = go.AddComponent<Camera>();
-        cam.nearClipPlane = 0.2f; cam.farClipPlane = 8000f; cam.fieldOfView = fov;
+        cam.nearClipPlane = near; cam.farClipPlane = 8000f; cam.fieldOfView = fov;
         if (edgeBlur) go.AddComponent<EdgeBlurEffect>().shader = Shader.Find("Hidden/ProjectGame/EdgeBlur");
         go.transform.position = pos;
         Vector3 dir = (target - pos).normalized;

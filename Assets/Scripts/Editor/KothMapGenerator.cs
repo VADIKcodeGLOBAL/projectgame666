@@ -1087,32 +1087,16 @@ public static class KothMapGenerator
         var fx = cam.AddComponent<EdgeBlurEffect>(); fx.shader = Shader.Find("Hidden/ProjectGame/EdgeBlur"); fx.health = health;
         player.AddComponent<SimpleFirstPersonController>().cameraPivot = cam.transform;
 
-        var gunRoot = new GameObject("Gun"); gunRoot.transform.SetParent(cam.transform, false); gunRoot.transform.localPosition = new Vector3(0.27f, -0.25f, 0.62f);
-        var gunBody = GameObject.CreatePrimitive(PrimitiveType.Cube); gunBody.name = "Body"; gunBody.transform.SetParent(gunRoot.transform, false);
-        UnityEngine.Object.DestroyImmediate(gunBody.GetComponent<Collider>());
-        gunBody.transform.localScale = new Vector3(0.045f, 0.06f, 0.46f);
-        var gunR = gunBody.GetComponent<Renderer>(); gunR.sharedMaterial = ColorMat("M_Gun", new Color(0.10f, 0.10f, 0.11f), "Standard"); gunR.shadowCastingMode = ShadowCastingMode.Off;
-        var grip = GameObject.CreatePrimitive(PrimitiveType.Cube); grip.name = "Grip"; grip.transform.SetParent(gunRoot.transform, false);
-        UnityEngine.Object.DestroyImmediate(grip.GetComponent<Collider>());
-        grip.transform.localScale = new Vector3(0.04f, 0.12f, 0.06f); grip.transform.localPosition = new Vector3(0f, -0.075f, -0.13f); grip.transform.localRotation = Quaternion.Euler(18f, 0f, 0f);
-        var gripR = grip.GetComponent<Renderer>(); gripR.sharedMaterial = gunR.sharedMaterial; gripR.shadowCastingMode = ShadowCastingMode.Off;
-        var muzzle = new GameObject("Muzzle"); muzzle.transform.SetParent(gunRoot.transform, false); muzzle.transform.localPosition = new Vector3(0f, 0f, 0.25f);
-        var flash = muzzle.AddComponent<Light>(); flash.type = LightType.Point; flash.range = 7f; flash.intensity = 2.6f; flash.color = new Color(1f, 0.75f, 0.35f); flash.enabled = false;
-        var tracer = gunRoot.AddComponent<LineRenderer>(); tracer.useWorldSpace = true; tracer.positionCount = 2; tracer.startWidth = 0.035f; tracer.endWidth = 0.015f;
-        tracer.sharedMaterial = ColorMat("M_Tracer", new Color(1f, 0.9f, 0.55f), "Unlit/Color"); tracer.shadowCastingMode = ShadowCastingMode.Off; tracer.enabled = false;
-        var audio = player.AddComponent<AudioSource>(); audio.playOnAwake = false; audio.spatialBlend = 0f;
-        var gun = player.AddComponent<PlayerGun>(); gun.cam = camera; gun.muzzle = muzzle.transform; gun.tracer = tracer; gun.flash = flash; gun.audioSource = audio;
-        gun.shotClips = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/SFX/Weapons" })
-            .Select(g => AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(g))).Where(c => c != null).ToArray();
+        var weapons = WeaponSetup.BuildPlayerWeapons(player, camera);               // AK-47, MP5, 10mm, sniper rifle
 
         // ---- the wave game and its HUD
         var gameGo = new GameObject("Game"); gameGo.transform.SetParent(parent, false);
         var game = gameGo.AddComponent<WaveSurvivalGame>();
         game.waves = s.waves; game.waveDuration = s.waveDuration; game.batchInterval = s.batchInterval; game.mobsPerBatch = s.mobsPerBatch;
-        game.zone = zone; game.player = player.transform; game.botPrefab = MakeBotPrefab();
+        game.zone = zone; game.player = player.transform; game.botPrefab = MakeBotPrefab(); game.ammoPickupPrefab = WeaponSetup.AmmoPickupPrefab();
         game.spawnRadius = Mathf.Min(s.playRadius + 15f, half - 14f); game.mapHalfSize = half - 8f;
-        var hud = gameGo.AddComponent<SurvivalHud>(); hud.game = game; hud.health = health; hud.gun = gun;
-        EditorAutomation.Log("  gameplay: " + s.waves + " waves x " + F1(s.waveDuration) + " s, " + s.mobsPerBatch + " bots x wave number every " + F1(s.batchInterval) + " s, bots appear " + F1(game.spawnRadius) + " m out, shot sounds: " + gun.shotClips.Length);
+        var hud = gameGo.AddComponent<SurvivalHud>(); hud.game = game; hud.health = health; hud.weapons = weapons;
+        EditorAutomation.Log("  gameplay: " + s.waves + " waves x " + F1(s.waveDuration) + " s, " + s.mobsPerBatch + " bots x wave number every " + F1(s.batchInterval) + " s, bots appear " + F1(game.spawnRadius) + " m out, weapons: " + weapons.weapons.Length);
     }
 
     // ================================================================== 10. lighting

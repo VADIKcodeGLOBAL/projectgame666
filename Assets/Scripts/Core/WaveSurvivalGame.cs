@@ -36,6 +36,12 @@ public class WaveSurvivalGame : MonoBehaviour
     [Tooltip("Health the player gets back for every bot killed.")] public float killHeal = 3f;
     public float mapHalfSize = 292f;
 
+    [Header("Ammo")]
+    public AmmoPickup ammoPickupPrefab;
+    [Tooltip("Chance that a killed bot drops a magazine.")] [Range(0f, 1f)] public float dropChance = 0.3f;
+    [Tooltip("Magazines kept lying inside the circle during a wave.")] public int summitMagazines = 2;
+    [Tooltip("Seconds between new magazines inside the circle.")] public float summitMagazineInterval = 20f;
+
     public static WaveSurvivalGame Instance { get; private set; }
     public GameState State { get; private set; }
     public int Wave { get; private set; }
@@ -54,7 +60,7 @@ public class WaveSurvivalGame : MonoBehaviour
     public float WaveProgress { get { return State == GameState.Wave ? Mathf.Clamp01(1f - TimeLeft / Mathf.Max(1f, waveDuration)) : 0f; } }
 
     PlayerHealth health;
-    float batchTimer; int toSpawn; float spawnTick; float batchAngle;
+    float batchTimer; int toSpawn; float spawnTick; float batchAngle; float summitAmmoTimer;
 
     void Awake()
     {
@@ -88,6 +94,8 @@ public class WaveSurvivalGame : MonoBehaviour
                 batchTimer -= dt; NextBatchIn = Mathf.Max(0f, batchTimer);              // the bots do not wait for you
                 if (batchTimer <= 0f) { StartBatch(); batchTimer += batchInterval; }
                 if (InZone) TimeLeft -= dt;                                              // progress only on the hill
+                summitAmmoTimer -= dt;
+                if (summitAmmoTimer <= 0f) { summitAmmoTimer = summitMagazineInterval; SpawnSummitMagazine(); }
                 if (TimeLeft <= 0f)
                 {
                     if (Wave >= waves) { End(true, "The hill is yours"); ClearBots(); }
@@ -135,6 +143,18 @@ public class WaveSurvivalGame : MonoBehaviour
     {
         Kills++;
         if (health != null) health.Heal(killHeal);
+        if (ammoPickupPrefab != null && bot != null && Random.value < dropChance) AmmoPickup.Spawn(ammoPickupPrefab, bot.transform.position);
+    }
+
+    void SpawnSummitMagazine()
+    {
+        if (ammoPickupPrefab == null || zone == null) return;
+        int onSummit = 0;
+        foreach (var p in AmmoPickup.All) if (p.OnSummit) onSummit++;
+        if (onSummit >= summitMagazines) return;
+        Vector2 r = Random.insideUnitCircle * zone.radius * 0.75f;
+        var pick = AmmoPickup.Spawn(ammoPickupPrefab, zone.transform.position + new Vector3(r.x, 0f, r.y));
+        if (pick != null) { pick.OnSummit = true; pick.lifetime = 1e6f; }      // the summit ones wait for you
     }
 
     void End(bool won, string reason)

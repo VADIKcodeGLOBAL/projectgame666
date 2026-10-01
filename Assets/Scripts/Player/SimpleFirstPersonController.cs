@@ -18,7 +18,13 @@ public class SimpleFirstPersonController : MonoBehaviour
     [Tooltip("Speed loss per unit of uphill grade; the map generator balances routes with the same value.")] public float slopeSlowdown = 1.6f;
     [Tooltip("Falling below this height puts the player back where they started.")] public float killHeight = -30f;
 
+    [Tooltip("Multiplier of the mouse look, set by the weapons (lower while zoomed in).")] public float lookScale = 1f;
+
     public Vector3 PlanarVelocity { get; private set; }
+    /// <summary>Camera pitch, degrees (negative = up).</summary>
+    public float Pitch { get { return pitch; } set { pitch = Mathf.Clamp(value, -85f, 85f); if (cameraPivot != null) cameraPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f); } }
+    /// <summary>Weapon recoil: lifts the view.</summary>
+    public void AddRecoil(float degreesUp) { Pitch = pitch - degreesUp; }
     public bool IsSprinting { get; private set; }
     public bool IsGrounded { get { return cc != null && cc.isGrounded; } }
 
@@ -44,8 +50,9 @@ public class SimpleFirstPersonController : MonoBehaviour
 
         if (Cursor.lockState == CursorLockMode.Locked)
         {
-            transform.Rotate(0f, Input.GetAxis("Mouse X") * mouseSensitivity, 0f);
-            pitch = Mathf.Clamp(pitch - Input.GetAxis("Mouse Y") * mouseSensitivity, -85f, 85f);
+            float sens = mouseSensitivity * lookScale;
+            transform.Rotate(0f, Input.GetAxis("Mouse X") * sens, 0f);
+            pitch = Mathf.Clamp(pitch - Input.GetAxis("Mouse Y") * sens, -85f, 85f);
             if (cameraPivot != null) cameraPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
         }
 
