@@ -9,8 +9,9 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// Field supplies and the menu side of the game:
-///  - pickup prefabs in Assets/Prefabs/Pickups: Ammo (magazine), Medkit and Syringe (speed), the last two from the models
-///    made by Source/Blender/Scripts/supply_models.py, each with an upright glow in its own colour;
+///  - pickup prefabs in Assets/Prefabs/Pickups: Magazine (ammo), Milk (heals) and EnergyDrink (speed), from the models in
+///    Assets/Art/Pickups/Models made by Source/Blender/Scripts/pickup_import.py (originals in Source/Models/Pickups),
+///    PBR textures in Assets/Art/Pickups/Textures, each with an upright glow in its own colour;
 ///  - SettingsMenu and MusicPlayer (with the music library of Assets/Audio/Music) on the Game object.
 /// Called by the hill map generator; command "gameplay" applies it to the open level, "supplies-view" renders the pickups.
 /// </summary>
@@ -19,6 +20,7 @@ public static class SupplySetup
     const string PrefabDir = "Assets/Prefabs/Pickups";
     const string ModelDir = "Assets/Art/Pickups/Models";
     const string MatDir = "Assets/Art/Pickups/Materials";
+    const string TexDir = "Assets/Art/Pickups/Textures";
 
     static void EnsureFolder(string path)
     {
@@ -26,46 +28,69 @@ public static class SupplySetup
         System.IO.Directory.CreateDirectory(path); AssetDatabase.Refresh();
     }
 
-    static Material Fade(string name, Color c, float gloss)
+    /// <summary>
+    /// PBR material for a pickup model (ProjectGame/WeaponPBR, separate metallic and roughness maps) from
+    /// Textures/&lt;name&gt;_BaseColor, _Normal, _Metallic, _Roughness (any of .jpg / .png), imported at 1024 px: a pickup is small on screen.
+    /// </summary>
+    static Material PbrMat(string name)
     {
-        var m = WeaponSetup.LitMat(name, c, 0f, gloss, Color.black, MatDir);
-        m.SetFloat("_Mode", 2f); m.SetOverrideTag("RenderType", "Transparent");
-        m.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha); m.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha); m.SetInt("_ZWrite", 0);
-        m.DisableKeyword("_ALPHATEST_ON"); m.EnableKeyword("_ALPHABLEND_ON"); m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        m.DisableKeyword("_EMISSION");
-        m.renderQueue = (int)RenderQueue.Transparent;
-        return m;
+        Func<string, string> find = kind =>
+        {
+            foreach (var ext in new[] { ".jpg", ".png", ".tga" })
+            {
+                string p = TexDir + "/" + name + "_" + kind + ext;
+                if (AssetImporter.GetAtPath(p) != null) return p;
+            }
+            return null;
+        };
+        string path = MatDir + "/M_" + name + ".mat";
+        EnsureFolder(MatDir);
+        var sh = Shader.Find("ProjectGame/WeaponPBR");
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null) { mat = new Material(sh); AssetDatabase.CreateAsset(mat, path); } else mat.shader = sh;
+        mat.SetTexture("_MainTex", WeaponSetup.Tex(find("BaseColor"), false, false, 1024));
+        mat.SetTexture("_BumpMap", WeaponSetup.Tex(find("Normal"), true, true, 1024));
+        mat.SetTexture("_MetallicMap", WeaponSetup.Tex(find("Metallic"), true, false, 512));
+        mat.SetTexture("_RoughnessMap", WeaponSetup.Tex(find("Roughness"), true, false, 512));
+        mat.SetColor("_EmissionColor", Color.black);
+        if (mat.GetTexture("_MainTex") == null) EditorAutomation.Log("  pickup " + name + ": no base colour texture in " + TexDir);
+        EditorUtility.SetDirty(mat);
+        return mat;
     }
 
-    static GameObject Model(string file, Dictionary<string, Material> mats)
+    /// <summary>The FBX made by Source/Blender/Scripts/pickup_import.py, its one material (named like the model) remapped to the PBR one.</summary>
+    static GameObject Model(string name)
     {
-        string path = ModelDir + "/" + file;
+        string path = ModelDir + "/" + name + ".fbx";
         var mi = AssetImporter.GetAtPath(path) as ModelImporter;
-        if (mi == null) throw new Exception("supply model not found: " + path + " (run supply_models.py)");
+        if (mi == null) throw new Exception("pickup model not found: " + path + " (run pickup_import.py)");
         mi.animationType = ModelImporterAnimationType.None; mi.importAnimation = false; mi.importCameras = false; mi.importLights = false;
-        foreach (var kv in mats) mi.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), kv.Key), kv.Value);
+        mi.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+        mi.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), name), PbrMat(name));
         mi.SaveAndReimport();
         return AssetDatabase.LoadAssetAtPath<GameObject>(path);
     }
 
-    /// <summary>Root with the pickup, a spinner holding the visual, and two crossed glow quads.</summary>
-    static SupplyPickup Prefab(string name, SupplyPickup.Kind kind, Color glow, Action<Transform> visual)
+    /// <summary>Root with the pickup, a spinner holding the model (largest side = size), and two crossed glow quads.</summary>
+    static SupplyPickup Prefab(string name, SupplyPickup.Kind kind, Color glow, float size)
     {
         EnsureFolder(PrefabDir);
+        var model = Model(name);
         var fx = WeaponSetup.MakeFx();
         var beam = WeaponSetup.FxMat("M_Glow_" + kind, (Texture2D)fx.beam.mainTexture, glow, 0.9f, MatDir);
         var root = new GameObject(name);
         var pick = root.AddComponent<SupplyPickup>(); pick.kind = kind;
+        pick.hoverHeight = size * 0.5f + 0.35f;                                       // the bottom of the model floats 35 cm above the grass
         var spin = new GameObject("Spinner").transform; spin.SetParent(root.transform, false);
-        visual(spin);
-        foreach (var r in spin.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
+        Place(spin, model, size);
+        foreach (var r in spin.GetComponentsInChildren<Renderer>()) { r.shadowCastingMode = ShadowCastingMode.Off; r.lightProbeUsage = LightProbeUsage.BlendProbes; }
         for (int k = 0; k < 2; k++)                                                   // a soft upright glow, seen over the grass
         {
             var q = GameObject.CreatePrimitive(PrimitiveType.Quad); q.name = "Glow" + k;
             Object.DestroyImmediate(q.GetComponent<Collider>());
             q.transform.SetParent(root.transform, false);
-            q.transform.localPosition = new Vector3(0f, -pick.hoverHeight + 1.1f, 0f); q.transform.localRotation = Quaternion.Euler(0f, k * 90f, 0f);
-            q.transform.localScale = new Vector3(0.35f, 2.2f, 1f);
+            q.transform.localPosition = new Vector3(0f, -pick.hoverHeight + 1.3f, 0f); q.transform.localRotation = Quaternion.Euler(0f, k * 90f, 0f);
+            q.transform.localScale = new Vector3(size * 0.75f, 2.6f, 1f);
             var r = q.GetComponent<MeshRenderer>(); r.sharedMaterial = beam; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
         }
         pick.spinner = spin;
@@ -85,49 +110,18 @@ public static class SupplySetup
         holder.position -= bounds().center - parent.position;
     }
 
-    public static SupplyPickup Ammo()
-    {
-        var body = WeaponSetup.LitMat("M_AmmoMagazine", new Color(0.09f, 0.09f, 0.10f), 0.6f, 0.45f, new Color(0.10f, 0.06f, 0.01f), MatDir);
-        var brass = WeaponSetup.LitMat("M_AmmoBrass", new Color(0.85f, 0.62f, 0.25f), 1f, 0.7f, new Color(0.55f, 0.35f, 0.08f), MatDir);
-        return Prefab("Ammo", SupplyPickup.Kind.Ammo, new Color(1f, 0.78f, 0.3f), spin =>
-        {
-            var mag = new GameObject("Magazine").transform; mag.SetParent(spin, false); mag.localScale = Vector3.one * 1.6f;
-            Action<string, Vector3, Vector3, Vector3, Material> part = (n, pos, rot, size, mat) =>
-            {
-                var g = GameObject.CreatePrimitive(PrimitiveType.Cube); g.name = n;
-                Object.DestroyImmediate(g.GetComponent<Collider>());
-                g.transform.SetParent(mag, false); g.transform.localPosition = pos; g.transform.localRotation = Quaternion.Euler(rot); g.transform.localScale = size;
-                g.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            };
-            part("Lower", new Vector3(0f, -0.07f, 0.012f), new Vector3(14f, 0f, 0f), new Vector3(0.035f, 0.13f, 0.075f), body);   // a curved rifle magazine
-            part("Upper", new Vector3(0f, 0.05f, 0f), Vector3.zero, new Vector3(0.035f, 0.12f, 0.075f), body);
-            part("Rounds", new Vector3(0f, 0.118f, 0f), Vector3.zero, new Vector3(0.022f, 0.018f, 0.065f), brass);
-        });
-    }
+    // sizes: the largest side, about 1.6x the old pickups (magazine 0.4 m, medkit 0.48 m, syringe 0.42 m)
+    public static SupplyPickup Ammo() { return Prefab("Magazine", SupplyPickup.Kind.Ammo, new Color(1f, 0.78f, 0.3f), 0.70f); }
+    public static SupplyPickup Medkit() { return Prefab("Milk", SupplyPickup.Kind.Medkit, new Color(0.85f, 0.93f, 1f), 0.75f); }
+    public static SupplyPickup Speed() { return Prefab("EnergyDrink", SupplyPickup.Kind.Speed, new Color(0.3f, 1f, 0.8f), 0.70f); }
 
-    public static SupplyPickup Medkit()
-    {
-        var model = Model("Medkit.fbx", new Dictionary<string, Material> {
-            { "Medkit_Body", WeaponSetup.LitMat("M_Medkit_Body", new Color(0.78f, 0.08f, 0.06f), 0.05f, 0.55f, new Color(0.18f, 0.01f, 0.0f), MatDir) },
-            { "Medkit_Cross", WeaponSetup.LitMat("M_Medkit_Cross", new Color(0.95f, 0.95f, 0.95f), 0f, 0.4f, new Color(0.35f, 0.35f, 0.35f), MatDir) },
-            { "Medkit_Handle", WeaponSetup.LitMat("M_Medkit_Handle", new Color(0.08f, 0.08f, 0.09f), 0.2f, 0.4f, Color.black, MatDir) } });
-        var p = Prefab("Medkit", SupplyPickup.Kind.Medkit, new Color(1f, 0.32f, 0.26f), spin => Place(spin, model, 0.48f));
-        return p;
-    }
-
-    public static SupplyPickup Speed()
-    {
-        var model = Model("Syringe.fbx", new Dictionary<string, Material> {
-            { "Syringe_Glass", Fade("M_Syringe_Glass", new Color(0.85f, 0.95f, 1f, 0.32f), 0.92f) },
-            { "Syringe_Liquid", WeaponSetup.LitMat("M_Syringe_Liquid", new Color(0.1f, 0.9f, 0.65f), 0f, 0.8f, new Color(0.15f, 1.4f, 1.0f), MatDir) },
-            { "Syringe_Plunger", WeaponSetup.LitMat("M_Syringe_Plunger", new Color(0.92f, 0.92f, 0.95f), 0f, 0.5f, Color.black, MatDir) },
-            { "Syringe_Metal", WeaponSetup.LitMat("M_Syringe_Metal", new Color(0.75f, 0.77f, 0.8f), 1f, 0.8f, Color.black, MatDir) } });
-        return Prefab("Syringe", SupplyPickup.Kind.Speed, new Color(0.3f, 1f, 0.8f), spin =>
-        {
-            var tilt = new GameObject("Tilt").transform; tilt.SetParent(spin, false); tilt.localRotation = Quaternion.Euler(0f, 0f, 35f);
-            Place(tilt, model, 0.42f);
-        });
-    }
+    /// <summary>The pickups of the previous version (procedural magazine, medkit and syringe models), removed once replaced.</summary>
+    static readonly string[] Obsolete = {
+        PrefabDir + "/Ammo.prefab", PrefabDir + "/Medkit.prefab", PrefabDir + "/Syringe.prefab",
+        ModelDir + "/Medkit.fbx", ModelDir + "/Syringe.fbx",
+        MatDir + "/M_AmmoMagazine.mat", MatDir + "/M_AmmoBrass.mat",
+        MatDir + "/M_Medkit_Body.mat", MatDir + "/M_Medkit_Cross.mat", MatDir + "/M_Medkit_Handle.mat",
+        MatDir + "/M_Syringe_Glass.mat", MatDir + "/M_Syringe_Liquid.mat", MatDir + "/M_Syringe_Plunger.mat", MatDir + "/M_Syringe_Metal.mat" };
 
     /// <summary>Supplies, settings menu and music on the wave game (shared by the generator and the "gameplay" command).</summary>
     public static void AddToGame(WaveSurvivalGame game)
@@ -140,9 +134,9 @@ public static class SupplySetup
         if (menu == null) menu = game.gameObject.AddComponent<SettingsMenu>();
         menu.music = music;
         EditorUtility.SetDirty(game); EditorUtility.SetDirty(music); EditorUtility.SetDirty(menu);
-        if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Weapons/AmmoPickup.prefab") != null)
-            AssetDatabase.DeleteAsset("Assets/Prefabs/Weapons/AmmoPickup.prefab");                  // replaced by Pickups/Ammo
-        EditorAutomation.Log("  supplies: ammo, medkit, syringe; music tracks " + music.TrackCount + "; settings menu on " + game.name);
+        int removed = 0;
+        foreach (var p in Obsolete) if (AssetImporter.GetAtPath(p) != null && AssetDatabase.DeleteAsset(p)) removed++;
+        EditorAutomation.Log("  supplies: magazine, milk, energy drink (old pickup assets removed: " + removed + "); music tracks " + music.TrackCount + "; settings menu on " + game.name);
     }
 
     /// <summary>"gameplay": supplies, settings and music in the open hill level, scene saved.</summary>
@@ -162,7 +156,7 @@ public static class SupplySetup
     /// <summary>"supplies-view": the three pickups side by side, high above the level (Logs/shots/supplies.png).</summary>
     public static void ViewShots()
     {
-        var names = new[] { "Ammo", "Medkit", "Syringe" };
+        var names = new[] { "Magazine", "Milk", "EnergyDrink" };
         var temp = new List<GameObject>();
         bool async = ShaderUtil.allowAsyncCompilation; ShaderUtil.allowAsyncCompilation = false;
         try
@@ -173,8 +167,11 @@ public static class SupplySetup
                 var p = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabDir + "/" + names[i] + ".prefab");
                 if (p == null) continue;
                 var g = Object.Instantiate(p, c + Vector3.right * (i - 1) * 0.9f, Quaternion.Euler(0f, 25f, 0f)); g.hideFlags = HideFlags.HideAndDontSave; temp.Add(g);
+                foreach (var gl in g.GetComponentsInChildren<Renderer>()) if (gl.name.StartsWith("Glow")) gl.enabled = false;   // the models, not the beams
             }
+            // the same camera as for the previous pickups, so the two pictures compare sizes
             EditorAutomation.Shot("supplies", c + new Vector3(0f, 0.35f, -2.6f), c + Vector3.up * 0.2f, 40f);
+            EditorAutomation.Shot("supplies_close", c + new Vector3(0f, 0.25f, -1.7f), c + Vector3.up * 0.05f, 40f);
         }
         finally { foreach (var g in temp) Object.DestroyImmediate(g); ShaderUtil.allowAsyncCompilation = async; }
         EditorAutomation.Log("SUPPLIES_VIEW_OK");

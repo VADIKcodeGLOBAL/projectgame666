@@ -3,9 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// A supply lying on the field: hovers and turns, is taken by walking into it, blinks before it disappears.
-///  - Ammo: one magazine for the weapon in hand (or the first weapon with room);
-///  - Medkit: health back (the only way to heal — there is no regeneration); left lying while health is full;
-///  - Speed (syringe): faster movement for a while.
+///  - Ammo (magazine): one magazine for the weapon in hand (or the first weapon with room);
+///  - Medkit (milk): health back (the only way to heal — there is no regeneration); left lying while health is full;
+///  - Speed (energy drink): faster movement for a while.
 /// Dropped by killed bots and laid out on the summit by the wave game.
 /// </summary>
 public class SupplyPickup : MonoBehaviour
@@ -63,12 +63,12 @@ public class SupplyPickup : MonoBehaviour
                 var hp = inv.Health;
                 if (hp == null || hp.IsDead || hp.IsFull) return false;
                 float before = hp.Health; hp.Heal(heal);
-                Announce("+" + Mathf.RoundToInt(hp.Health - before) + " HP  MEDKIT", kind); return true;
+                Announce("+" + Mathf.RoundToInt(hp.Health - before) + " HP  MILK", kind); return true;
             case Kind.Speed:
                 var fp = inv.Controller;
                 if (fp == null) return false;
                 fp.ApplySpeedBoost(speedMultiplier, speedDuration);
-                Announce("SPEED +" + Mathf.RoundToInt((speedMultiplier - 1f) * 100f) + " %  FOR " + Mathf.RoundToInt(speedDuration) + " S", kind); return true;
+                Announce("ENERGY DRINK  SPEED +" + Mathf.RoundToInt((speedMultiplier - 1f) * 100f) + " %  FOR " + Mathf.RoundToInt(speedDuration) + " S", kind); return true;
         }
         return false;
     }

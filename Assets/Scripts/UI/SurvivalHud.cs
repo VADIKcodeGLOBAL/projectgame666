@@ -134,7 +134,7 @@ public class SurvivalHud : MonoBehaviour
         if (alpha > 0f && tPickup.Changed((long)(SupplyPickup.LastTime * 1000f)))
         {
             view.pickup.text = SupplyPickup.LastMessage;
-            view.pickup.color = SupplyPickup.LastKind == SupplyPickup.Kind.Medkit ? new Color(1f, 0.45f, 0.4f)
+            view.pickup.color = SupplyPickup.LastKind == SupplyPickup.Kind.Medkit ? new Color(0.92f, 0.96f, 1f)
                               : SupplyPickup.LastKind == SupplyPickup.Kind.Speed ? new Color(0.4f, 1f, 0.85f) : HudView.Gold;
         }
         Show(view.crosshair, !over && !scoped);

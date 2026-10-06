@@ -142,7 +142,8 @@ public static partial class EditorAutomation
                 var bt = tb.body.transform; Vector3 fwd = bt.forward;
                 Vector3 corner = bt.TransformPoint(new Vector3(0.45f, 0.45f, 0f)) - fwd * 12f, beside = bt.TransformPoint(new Vector3(0.56f, 0.45f, 0f)) - fwd * 12f;
                 float d1 = 600f, d2 = 600f;
-                bool hitCorner = EnemyBot.RaycastBodies(corner, fwd, ref d1) == tb, hitBeside = EnemyBot.RaycastBodies(beside, fwd, ref d2) == tb;
+                // this bot only: with 20 bots around, another one can stand on the same line
+                bool hitCorner = tb.RayHitsBody(corner, fwd, d1, out d1), hitBeside = tb.RayHitsBody(beside, fwd, d2, out d2);
                 bool capsuleCorner = Physics.Raycast(corner, fwd, 30f, 1 << 2, QueryTriggerInteraction.Ignore);
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 for (int i = 0; i < 2000; i++) { float d = 600f; EnemyBot.RaycastBodies(fp.transform.position + Vector3.up * 1.6f, UnityEngine.Random.onUnitSphere, ref d); }

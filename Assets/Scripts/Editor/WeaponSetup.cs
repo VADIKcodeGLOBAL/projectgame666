@@ -90,7 +90,7 @@ public static class WeaponSetup
     }
 
     // ------------------------------------------------------------------ textures and materials
-    static Texture2D Tex(string path, bool linear, bool normal, int maxSize = 2048)
+    public static Texture2D Tex(string path, bool linear, bool normal, int maxSize = 2048)
     {
         if (string.IsNullOrEmpty(path)) return null;
         var ti = AssetImporter.GetAtPath(path) as TextureImporter;

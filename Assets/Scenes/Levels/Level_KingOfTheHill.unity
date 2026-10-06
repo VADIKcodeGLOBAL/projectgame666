@@ -694,7 +694,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 64
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -20100,7 +20100,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 46
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -21439,7 +21439,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 52
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -22184,9 +22184,9 @@ MonoBehaviour:
   zone: {fileID: 1993763130}
   player: {fileID: 891331418}
   mapHalfSize: 292
-  ammoPickupPrefab: {fileID: 8012029768963275780, guid: 44c81f6b272026e45affb58e9927aad1, type: 3}
-  medkitPrefab: {fileID: 9158479859044556007, guid: 1fa85bccadc11d644ac00560f778d734, type: 3}
-  speedPrefab: {fileID: 1403987391487425131, guid: ffbf960a7f68fe64c8a217daa85604f7, type: 3}
+  ammoPickupPrefab: {fileID: 1535492740314988350, guid: 5de96b036f2710849bf89f45c7deee1f, type: 3}
+  medkitPrefab: {fileID: 3101578968749826786, guid: 0fcb616f901d91d4f9410902e988261d, type: 3}
+  speedPrefab: {fileID: 282749708254337244, guid: 93811a8760f1289499c0018e543754af, type: 3}
   dropChance: 0.3
   medkitDropChance: 0.15
   speedDropChance: 0.05

@@ -47,27 +47,36 @@ public class EnemyBot : MonoBehaviour
         EnemyBot best = null;
         for (int i = 0; i < All.Count; i++)
         {
-            var b = All[i]; if (b.IsDying || b.body == null) continue;
-            Transform bt = b.body.transform;
-            Vector3 v = bt.position - origin;
-            float along = Vector3.Dot(v, dir), r = 0.5f * bt.lossyScale.magnitude;      // bounding sphere first: most bots are far off the line
-            if (along < -r || along > maxDist + r || v.sqrMagnitude - along * along > r * r) continue;
-
-            Matrix4x4 m = bt.worldToLocalMatrix;                                  // slab test in the cube's space, where it spans -0.5..0.5
-            Vector3 lo = m.MultiplyPoint3x4(origin), ld = m.MultiplyVector(dir);  // the ray parameter stays the world distance
-            float t0 = 0f, t1 = maxDist; bool miss = false;
-            for (int k = 0; k < 3 && !miss; k++)
-            {
-                if (Mathf.Abs(ld[k]) < 1e-8f) { miss = lo[k] < -0.5f || lo[k] > 0.5f; continue; }
-                float inv = 1f / ld[k], a = (-0.5f - lo[k]) * inv, c = (0.5f - lo[k]) * inv;
-                if (a > c) { float s = a; a = c; c = s; }
-                if (a > t0) t0 = a;
-                if (c < t1) t1 = c;
-                miss = t0 > t1;
-            }
-            if (!miss) { best = b; maxDist = t0; }
+            var b = All[i]; float t;
+            if (b.RayHitsBody(origin, dir, maxDist, out t)) { best = b; maxDist = t; }
         }
         return best;
+    }
+
+    /// <summary>Whether the ray (unit dir) crosses this bot's body box closer than maxDist; t = the distance to it.</summary>
+    public bool RayHitsBody(Vector3 origin, Vector3 dir, float maxDist, out float t)
+    {
+        t = 0f;
+        if (IsDying || body == null) return false;
+        Transform bt = body.transform;
+        Vector3 v = bt.position - origin;
+        float along = Vector3.Dot(v, dir), r = 0.5f * bt.lossyScale.magnitude;      // bounding sphere first: most bots are far off the line
+        if (along < -r || along > maxDist + r || v.sqrMagnitude - along * along > r * r) return false;
+
+        Matrix4x4 m = bt.worldToLocalMatrix;                                  // slab test in the cube's space, where it spans -0.5..0.5
+        Vector3 lo = m.MultiplyPoint3x4(origin), ld = m.MultiplyVector(dir);  // the ray parameter stays the world distance
+        float t0 = 0f, t1 = maxDist;
+        for (int k = 0; k < 3; k++)
+        {
+            if (Mathf.Abs(ld[k]) < 1e-8f) { if (lo[k] < -0.5f || lo[k] > 0.5f) return false; continue; }
+            float inv = 1f / ld[k], a = (-0.5f - lo[k]) * inv, c = (0.5f - lo[k]) * inv;
+            if (a > c) { float s = a; a = c; c = s; }
+            if (a > t0) t0 = a;
+            if (c < t1) t1 = c;
+            if (t0 > t1) return false;
+        }
+        t = t0;
+        return true;
     }
 
     public void Init(Transform player, float health, float moveSpeed, float hitDamage, float size, Color glowColor)

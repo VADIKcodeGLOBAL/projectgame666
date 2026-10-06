@@ -24,3 +24,6 @@ crashlytics-build.properties
 
 # misc
 *.tmp
+
+# drop folder for incoming files (originals are copied to Source/ when used)
+/from me/
