@@ -160,8 +160,9 @@ public class Weapon : MonoBehaviour
         if (Owner != null) Owner.OnRoundFired(this, hit);
     }
 
-    /// <summary>View-model motion. raise: 0 lowered out of sight (switching) .. 1 in hand; aim: 0..1 scope; bob: walk sway.</summary>
-    public void UpdatePose(float raise, float aim, Vector3 bob)
+    /// <summary>View-model motion. raise: 0 lowered out of sight (switching) .. 1 in hand; aim: 0..1 scope; bob: walk sway;
+    /// swayTilt (degrees) and swayShift (metres): the lag behind a turning view, both in camera space.</summary>
+    public void UpdatePose(float raise, float aim, Vector3 bob, Vector3 swayTilt, Vector3 swayShift)
     {
         float dt = Time.deltaTime;
         if (Time.time > effectOff)
@@ -173,11 +174,11 @@ public class Weapon : MonoBehaviour
 
         float r = ReloadProgress, dip = Mathf.Sin(r * Mathf.PI);           // down, turned towards you, and back up
         float low = 1f - raise; low *= low;
-        Vector3 p = restPos + kick * kickAmount + bob * (1f - aim)
+        Vector3 p = restPos + kick * kickAmount + (bob + swayShift) * (1f - aim)
                     + new Vector3(-0.03f, -0.09f, -0.03f) * dip + new Vector3(0f, -0.30f, -0.05f) * low;
         p = Vector3.Lerp(p, new Vector3(0f, -0.06f, restPos.z), aim * 0.7f);    // towards the eye while the scope comes up
         transform.localPosition = p;
-        transform.localRotation = restRot * Quaternion.Euler(-kickPitch * kickAmount + 18f * dip + 30f * low, -10f * dip, -32f * dip);
+        transform.localRotation = Quaternion.Euler(swayTilt * (1f - aim)) * restRot * Quaternion.Euler(-kickPitch * kickAmount + 18f * dip + 30f * low, -10f * dip, -32f * dip);
 
         bool show = aim < 0.85f;                                            // through the scope the gun itself is not drawn
         if (show != modelVisible) { modelVisible = show; foreach (var mr in modelRenderers) if (mr != null) mr.enabled = show; }

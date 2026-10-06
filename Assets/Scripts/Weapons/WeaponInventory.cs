@@ -14,6 +14,13 @@ public class WeaponInventory : MonoBehaviour
     [Tooltip("Lower the old weapon + raise the new one, seconds.")] public float switchTime = 0.45f;
     public float scopeTime = 0.18f;
 
+    [Header("Sway")]
+    [Tooltip("The gun lags behind the turning view: degrees of tilt per 100 °/s of turning.")] public float swayAngle = 1.2f;
+    [Tooltip("The gun slides the other way while turning: metres per 100 °/s of turning.")] public float swayShift = 0.006f;
+    [Tooltip("Most the gun tilts away from the view, degrees.")] public float swayMaxAngle = 4f;
+    [Tooltip("Side lean of the gun into a turn, part of the tilt.")] public float swayRoll = 0.6f;
+    [Tooltip("How fast the gun follows the view and comes back to rest, 1/s; lower is softer and lazier.")] public float swaySmoothing = 9f;
+
     public static WeaponInventory Instance { get; private set; }
     /// <summary>The player's components, cached for the supplies.</summary>
     public PlayerHealth Health { get; private set; }
@@ -31,7 +38,8 @@ public class WeaponInventory : MonoBehaviour
     public float PickupTime { get; private set; } = -10f;
 
     SimpleFirstPersonController fp;
-    float baseFov = 70f, raise = 1f, bobT;
+    float baseFov = 70f, raise = 1f, bobT, lastYaw, lastPitch;
+    Vector2 sway;                                                          // x yaw, y pitch of the gun against the view, degrees
     int pending = -1;
     bool triggerArmed, prevHeld, testActive, testTrigger, testAim;
     AudioSource[] voicePool; int nextVoice;
@@ -42,6 +50,7 @@ public class WeaponInventory : MonoBehaviour
     {
         Instance = this;
         fp = GetComponent<SimpleFirstPersonController>(); Health = GetComponent<PlayerHealth>();
+        lastYaw = transform.eulerAngles.y; lastPitch = fp != null ? fp.Pitch : 0f;   // no sway kick on the first frame
         baseFov = GameSettings.Fov;
         if (cam != null) cam.fieldOfView = baseFov;
         weapons = weapons == null ? new Weapon[0] : System.Array.FindAll(weapons, x => x != null);   // a missing reference must not break the rest
@@ -90,7 +99,8 @@ public class WeaponInventory : MonoBehaviour
     // LateUpdate: the mouse look of this frame is applied, so the round goes where the crosshair is
     void LateUpdate()
     {
-        var w = Current; if (w == null || Holstered) return;
+        Vector2 turned = ViewTurned();                                     // measured every frame, so a cannon spell leaves no jump behind
+        var w = Current; if (w == null || Holstered) { sway = Vector2.zero; return; }
         var game = WaveSurvivalGame.Instance;
         bool over = game != null && game.IsOver;
         bool held, aimHeld;
@@ -141,7 +151,28 @@ public class WeaponInventory : MonoBehaviour
         float speed = fp != null && fp.IsGrounded ? fp.PlanarVelocity.magnitude : 0f;
         bobT += Time.deltaTime * speed * 1.35f;
         float k = Mathf.Clamp01(speed / 8.5f);
-        w.UpdatePose(raise, Aim, new Vector3(Mathf.Cos(bobT) * 0.007f, -Mathf.Abs(Mathf.Sin(bobT)) * 0.009f, 0f) * k);
+
+        // sway: the gun trails the turning view a little and settles back when the view stops
+        float dt = Time.deltaTime;
+        if (dt > 0f)
+        {
+            float perDegPerSec = swayAngle / 100f / dt;
+            Vector2 target = new Vector2(Mathf.Clamp(-turned.x * perDegPerSec, -swayMaxAngle, swayMaxAngle),
+                                         Mathf.Clamp(-turned.y * perDegPerSec, -swayMaxAngle, swayMaxAngle));
+            sway = Vector2.Lerp(sway, target, 1f - Mathf.Exp(-swaySmoothing * dt));
+        }
+        float shift = swayAngle > 0.0001f ? swayShift / swayAngle : 0f;
+        w.UpdatePose(raise, Aim, new Vector3(Mathf.Cos(bobT) * 0.007f, -Mathf.Abs(Mathf.Sin(bobT)) * 0.009f, 0f) * k,
+                     new Vector3(sway.y, sway.x, sway.x * swayRoll), new Vector3(sway.x, -sway.y, 0f) * shift);
+    }
+
+    /// <summary>How far the view turned since the last frame, degrees: x yaw (right +), y pitch (down +).</summary>
+    Vector2 ViewTurned()
+    {
+        float yaw = transform.eulerAngles.y, pitch = fp != null ? fp.Pitch : 0f;
+        var d = new Vector2(Mathf.DeltaAngle(lastYaw, yaw), pitch - lastPitch);
+        lastYaw = yaw; lastPitch = pitch;
+        return d;
     }
 
     public void OnRoundFired(Weapon w, bool hit)
