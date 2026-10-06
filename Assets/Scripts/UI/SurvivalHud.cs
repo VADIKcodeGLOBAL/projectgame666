@@ -137,7 +137,9 @@ public class SurvivalHud : MonoBehaviour
             view.pickup.color = SupplyPickup.LastKind == SupplyPickup.Kind.Medkit ? new Color(0.92f, 0.96f, 1f)
                               : SupplyPickup.LastKind == SupplyPickup.Kind.Speed ? new Color(0.4f, 1f, 0.85f) : HudView.Gold;
         }
-        Show(view.crosshair, !over && !scoped);
+        var cannon = FieldCannon.Active;
+        Show(view.crosshair, !over && !scoped && cannon == null);
+        UpdateCannon(cannon, over);
         int hit = weapons != null && Time.time - weapons.LastHitTime < 0.12f ? 1 : 0;
         if (hit != hitState)
         {
@@ -190,10 +192,44 @@ public class SurvivalHud : MonoBehaviour
         }
     }
 
+    readonly TextSlot tCannonInfo = new TextSlot(), tCannonState = new TextSlot(), tPrompt = new TextSlot();
+
+    /// <summary>The cannon sight while aiming, the push hint while pushing, the offer to use it when standing next to it.</summary>
+    void UpdateCannon(FieldCannon cannon, bool over)
+    {
+        if (view.cannonGroup == null) return;                            // a HUD canvas baked before the cannon existed
+        bool aiming = cannon != null && cannon.Current == FieldCannon.Mode.Aiming && !over;
+        bool pushing = cannon != null && cannon.Current == FieldCannon.Mode.Pushing && !over;
+        Show(view.cannonGroup, aiming);
+        if (aiming)
+        {
+            int range = Mathf.RoundToInt(cannon.Range), elev = Mathf.RoundToInt(cannon.Elevation * 10f), flight = Mathf.RoundToInt(cannon.FlightTime * 10f);
+            if (tCannonInfo.Changed(((long)range << 32) | ((long)(elev + 1000) << 16) | (uint)flight))
+                view.cannonInfo.text = (cannon.HasImpact ? "RANGE " + range + " m" : "RANGE -") + "     ELEV " + (elev / 10) + "." + Mathf.Abs(elev % 10) + "°     FLIGHT " + (flight / 10) + "." + (flight % 10) + " s";
+            int state = !cannon.InRange ? (cannon.Obstructed ? 4 : 0) : !cannon.Loaded ? 1 : !cannon.OnTarget ? 2 : 3;
+            if (tCannonState.Changed(state))
+            {
+                Color c = state == 0 || state == 4 ? HudView.Warn : state == 3 ? new Color(0.45f, 1f, 0.5f, 0.95f) : new Color(1f, 0.75f, 0.3f, 0.95f);
+                view.cannonStatus.text = state == 0 ? "OUT OF RANGE" : state == 4 ? "NO CLEAR SHOT" : state == 1 ? "RELOADING" : state == 2 ? "AIMING" : "READY";
+                view.cannonStatus.color = c;
+                foreach (var b in view.cannonBars) if (b != null) b.color = c;
+            }
+            Show(view.cannonReload, !cannon.Loaded);
+            if (!cannon.Loaded) Fill(view.cannonReloadFill, cannon.ReloadProgress);
+        }
+        int p = over ? 0 : pushing ? 2 : aiming ? 0 : FieldCannon.Nearby != null && FieldCannon.Active == null ? 1 : 0;
+        if (pushing && cannon.PushBlocked) p = 3;
+        if (tPrompt.Changed(p))
+            view.prompt.text = p == 1 ? "E - aim the cannon          F - push it"
+                             : p == 2 ? "W / S - push and pull     A / D, mouse - turn     F - let go"
+                             : p == 3 ? "BLOCKED  -  W / S - push and pull     A / D, mouse - turn     F - let go" : "";
+        Show(view.prompt.gameObject, p != 0);
+    }
+
     void UpdateAmmo()
     {
         var w = weapons != null ? weapons.Current : null;
-        Show(view.ammo, w != null);
+        Show(view.ammo, w != null && FieldCannon.Active == null);
         if (w == null) return;
         if (tName.Changed(weapons.CurrentIndex)) view.weaponName.text = w.displayName.ToUpperInvariant();
         if (tRounds.Changed(w.InMagazine)) view.rounds.text = w.InMagazine.ToString();

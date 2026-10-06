@@ -19,12 +19,18 @@ public static partial class EditorAutomation
     /// and a 0.6 m block (stops), a low ceiling, a bot in the way, ramps of 30 degrees (walkable) and 60 degrees (slides, cannot be climbed).
     /// Test geometry is built on the summit plateau and disappears with the Play session.
     /// </summary>
-    static void MoveTick()
+    static void MoveTick() { SuiteTick(MoveTests, "MOVETEST"); }
+
+    static string suiteName = "MOVETEST";
+
+    /// <summary>Runs a test suite written as an iterator (yield null = next frame; yield an IEnumerator = run it first).</summary>
+    static void SuiteTick(Func<IEnumerator> suite, string name)
     {
         if (!EditorApplication.isPlaying || Time.timeSinceLevelLoad < 1.5f) return;
         if (moveTestRunner == null)
         {
-            moveTestRunner = new Stack<IEnumerator>(); moveTestRunner.Push(MoveTests());
+            suiteName = name;
+            moveTestRunner = new Stack<IEnumerator>(); moveTestRunner.Push(suite());
             moveFailures = 0; moveChecks = 0; moveTemp.Clear();
             savedFrameRate = Application.targetFrameRate; savedVSync = QualitySettings.vSyncCount;
         }
@@ -45,8 +51,8 @@ public static partial class EditorAutomation
         foreach (var g in moveTemp) if (g != null) Object.Destroy(g);
         moveTemp.Clear();
         if (moveTestRunner != null) moveTestRunner.Clear();
-        if (error != null) Log("MOVETEST_FAILED: " + error);
-        else Log(moveFailures == 0 ? "MOVETEST_OK (" + moveChecks + " checks)" : "MOVETEST_FAILED: " + moveFailures + " of " + moveChecks + " checks");
+        if (error != null) Log(suiteName + "_FAILED: " + error);
+        else Log(moveFailures == 0 ? suiteName + "_OK (" + moveChecks + " checks)" : suiteName + "_FAILED: " + moveFailures + " of " + moveChecks + " checks");
         Stop();
     }
 

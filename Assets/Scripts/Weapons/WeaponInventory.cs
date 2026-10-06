@@ -67,6 +67,19 @@ public class WeaponInventory : MonoBehaviour
     public void SetTestInput(bool trigger, bool aim) { testActive = true; testTrigger = trigger; testAim = aim; }
     public void ClearTestInput() { testActive = false; testTrigger = false; testAim = false; }
 
+    /// <summary>Weapons put away (using a cannon): the one in hand is hidden, nothing fires, the view is not zoomed.</summary>
+    public bool Holstered { get; private set; }
+    public void SetHolstered(bool on)
+    {
+        if (Holstered == on) return;
+        Holstered = on;
+        var w = Current;
+        if (w != null) { w.CancelReload(); w.gameObject.SetActive(!on); }
+        Aim = 0f; triggerArmed = false; prevHeld = true;
+        if (cam != null) cam.fieldOfView = baseFov;
+        if (fp != null) fp.lookScale = 1f;
+    }
+
     public void Select(int index)
     {
         if (index < 0 || index >= weapons.Length || index == Target) return;
@@ -77,7 +90,7 @@ public class WeaponInventory : MonoBehaviour
     // LateUpdate: the mouse look of this frame is applied, so the round goes where the crosshair is
     void LateUpdate()
     {
-        var w = Current; if (w == null) return;
+        var w = Current; if (w == null || Holstered) return;
         var game = WaveSurvivalGame.Instance;
         bool over = game != null && game.IsOver;
         bool held, aimHeld;

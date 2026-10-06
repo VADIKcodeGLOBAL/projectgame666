@@ -65,6 +65,7 @@ public static partial class EditorAutomation
         string mode = SessionState.GetString(ModeKey, "playtest");
         if (mode == "perftest") { PerfTick(); return; }
         if (mode == "movetest") { MoveTick(); return; }
+        if (mode == "cannontest") { SuiteTick(CannonTests, "CANNONTEST"); return; }
         float t = Time.timeSinceLevelLoad;
         if (t < 1.5f) return;
         var game = WaveSurvivalGame.Instance;
@@ -450,6 +451,9 @@ public static partial class EditorAutomation
             else if (cmd == "hud") HudSetup.InstallInOpenScene();
             else if (cmd == "player") PlayerSetup.InstallInOpenScene();
             else if (cmd == "movetest") { moveTestRunner = null; ArmPlaytest("movetest"); }
+            else if (cmd == "cannontest") { moveTestRunner = null; ArmPlaytest("cannontest"); }
+            else if (cmd == "cannon") CannonSetup.InstallInOpenScene();
+            else if (cmd == "cannon-view") CannonSetup.ViewShots();
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }

@@ -50,6 +50,14 @@ public class HudView : MonoBehaviour
     public Text[] slotTexts;
     public Text kills;
 
+    [Header("Cannon")]
+    public GameObject cannonGroup;
+    public Image[] cannonBars;
+    public Text cannonInfo, cannonStatus, cannonHint;
+    public GameObject cannonReload;
+    public RectTransform cannonReloadFill;
+    public Text prompt;
+
     [Header("End screen")]
     public GameObject endScreen;
     public Text endTitle, endReason, endStats;
@@ -194,6 +202,30 @@ public class HudView : MonoBehaviour
         var br = Layer("BottomRight", root);
         v.slotsRoot = Node("Slots", br, BR, BR, new Vector2(-24f, 60f), new Vector2(300f, 24f));
         v.kills = Label("Kills", br, BR, BR, new Vector2(-24f, 24f), new Vector2(300f, 28f), 20, TextAnchor.MiddleCenter, Color.white, true, "KILLS 0");
+
+        // ---- cannon: its sight (the crosshair is where the ball lands), readouts, reload; the "use it" prompt
+        var cn = Layer("Cannon", root); v.cannonGroup = cn.gameObject;
+        Color cg = new Color(0.45f, 1f, 0.5f, 0.95f);
+        var bars = new System.Collections.Generic.List<Image>();
+        foreach (var d in new[] { new Vector2(1f, 0f), new Vector2(-1f, 0f), new Vector2(0f, 1f), new Vector2(0f, -1f) })
+        {
+            Vector2 sz = d.x != 0f ? new Vector2(16f, 3f) : new Vector2(3f, 16f);
+            bars.Add(Box("Bar", cn, C, C, d * 22f, sz, cg));
+            bars.Add(Box("Tick", cn, C, C, d * 44f, d.x != 0f ? new Vector2(8f, 2f) : new Vector2(2f, 8f), cg));
+        }
+        bars.Add(Box("Dot", cn, C, C, Vector2.zero, new Vector2(4f, 4f), cg));
+        v.cannonBars = bars.ToArray();
+        v.cannonStatus = Label("Status", cn, C, TC, new Vector2(0f, -62f), new Vector2(600f, 26f), 20, TextAnchor.MiddleCenter, cg, true, "READY");
+        v.cannonInfo = Label("Info", cn, C, TC, new Vector2(0f, -88f), new Vector2(900f, 24f), 17, TextAnchor.MiddleCenter, Color.white, true, "RANGE 0 m     ELEV 0.0°     FLIGHT 0.0 s");
+        Image cannonFillImage;
+        v.cannonReloadFill = Bar("Reload", cn, C, TC, new Vector2(0f, -116f), new Vector2(220f, 6f), new Color(0f, 0f, 0f, 0.6f), Gold, 0f, out cannonFillImage);
+        v.cannonReload = v.cannonReloadFill.parent.gameObject;
+        v.cannonHint = Label("Hint", cn, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 92f), new Vector2(1200f, 24f), 17, TextAnchor.MiddleCenter, Color.white, true,
+            "LMB - fire     RMB - zoom     mouse - aim     E - leave the cannon");
+        v.cannonGroup.SetActive(false);
+        var pr = Layer("Prompt", root);
+        v.prompt = Label("Text", pr, new Vector2(0.5f, 0.3f), C, Vector2.zero, new Vector2(1400f, 30f), 21, TextAnchor.MiddleCenter, Gold, true, "");
+        v.prompt.gameObject.SetActive(false);
 
         // ---- end screen
         var end = Layer("EndScreen", root); v.endScreen = end.gameObject;
