@@ -1080,11 +1080,11 @@ public static class KothMapGenerator
         Vector2 pp = r0.dir * 3.5f;
         player.transform.position = new Vector3(pp.x, GroundY(pp.x, pp.y) + 0.15f, pp.y);
         player.transform.rotation = Quaternion.LookRotation(new Vector3(r0.dir.x, 0f, r0.dir.y));
-        var cc = player.AddComponent<CharacterController>(); cc.height = 1.8f; cc.radius = 0.35f; cc.center = new Vector3(0f, 0.9f, 0f); cc.slopeLimit = 50f; cc.stepOffset = 0.4f;
         var health = player.AddComponent<PlayerHealth>();
         var cam = new GameObject("Camera"); cam.transform.SetParent(player.transform, false); cam.transform.localPosition = new Vector3(0f, 1.62f, 0f); cam.tag = "MainCamera";
         var camera = cam.AddComponent<Camera>(); camera.nearClipPlane = 0.12f; camera.farClipPlane = 8000f; camera.fieldOfView = 70f; cam.AddComponent<AudioListener>();
         var fx = cam.AddComponent<EdgeBlurEffect>(); fx.shader = Shader.Find("Hidden/ProjectGame/EdgeBlur"); fx.health = health;
+        PlayerSetup.Configure(player, cam.transform);                             // capsule + kinematic body + CharacterMotor
         player.AddComponent<SimpleFirstPersonController>().cameraPivot = cam.transform;
 
         var weapons = WeaponSetup.BuildPlayerWeapons(player, camera);               // AK-47, MP5, 10mm, sniper rifle

@@ -44,7 +44,7 @@ public static partial class EditorAutomation
         {
             case 0:
             {
-                Teleport(fp.GetComponent<CharacterController>(), c);
+                Teleport(fp, c);
                 game.maxAlive = 1000;
                 var terrain = Terrain.activeTerrain;
                 for (int i = 0; i < 200; i++)

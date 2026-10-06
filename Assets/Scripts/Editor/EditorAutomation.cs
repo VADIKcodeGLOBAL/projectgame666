@@ -48,10 +48,11 @@ public static partial class EditorAutomation
 
     static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
 
-    static void Teleport(CharacterController cc, Vector3 p)
+    /// <summary>The player 0.3 m above the terrain at (x, z), landed by the motor.</summary>
+    static void Teleport(SimpleFirstPersonController fp, Vector3 p)
     {
         var t = Terrain.activeTerrain; if (t != null) p.y = t.SampleHeight(p) + t.transform.position.y + 0.3f;
-        cc.enabled = false; cc.transform.position = p; cc.enabled = true;
+        fp.Teleport(p);
     }
 
     /// <summary>
@@ -61,13 +62,15 @@ public static partial class EditorAutomation
     static void PlayTick()
     {
         if (!EditorApplication.isPlaying) return;
-        if (SessionState.GetString(ModeKey, "playtest") == "perftest") { PerfTick(); return; }
+        string mode = SessionState.GetString(ModeKey, "playtest");
+        if (mode == "perftest") { PerfTick(); return; }
+        if (mode == "movetest") { MoveTick(); return; }
         float t = Time.timeSinceLevelLoad;
         if (t < 1.5f) return;
         var game = WaveSurvivalGame.Instance;
         var fp = UnityEngine.Object.FindFirstObjectByType<SimpleFirstPersonController>();
         if (game == null || fp == null || game.zone == null) { Log("PLAYTEST_FAILED: game, player or zone missing"); Stop(); return; }
-        var cc = fp.GetComponent<CharacterController>(); var hp = fp.GetComponent<PlayerHealth>();
+        var hp = fp.GetComponent<PlayerHealth>();
         Vector3 c = game.zone.transform.position;
         if (t > 120f && playPhase != 9 && playPhase != 10) { Log("PLAYTEST_FAILED: timeout in phase " + playPhase); playPhase = 9; playT = t; return; }
 
@@ -76,7 +79,7 @@ public static partial class EditorAutomation
             case 0:
                 game.waveDuration = 16f; game.batchInterval = 6f; game.intermission = 3f;
                 runDir = Vector3.right;
-                Teleport(cc, c - runDir * 10f); fp.transform.rotation = Quaternion.LookRotation(runDir);
+                Teleport(fp, c - runDir * 10f); fp.transform.rotation = Quaternion.LookRotation(runDir);
                 fp.SetTestInput(Vector3.forward, true, false);
                 Log("  playtest: short timings (wave 16 s, batch every 6 s); sprint test starts");
                 playPhase = 1; tA = t; break;
@@ -93,14 +96,14 @@ public static partial class EditorAutomation
                     float vAfter = fp.PlanarVelocity.magnitude, need = fp.sprintSpeed * 0.9f;
                     Log("  playtest sprint: run " + F(vRun) + " m/s, in the air " + F(vAir) + ", after landing " + F(vAfter) + " (sprint " + F(fp.sprintSpeed) + ")");
                     if (vRun < need || vAir < need || vAfter < need) { Log("PLAYTEST_FAILED: sprint is lost around the jump"); playPhase = 9; playT = t; break; }
-                    fp.ClearTestInput(); Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                    fp.ClearTestInput(); Teleport(fp, c + new Vector3(0.5f, 0f, 0.5f));
                     playPhase = 3;
                 }
                 else if (t > tB + 3f) { Log("PLAYTEST_FAILED: the jump did not land"); playPhase = 9; playT = t; }
                 break;
             case 3:
                 if (game.State != WaveSurvivalGame.GameState.Wave || game.TimeLeft > game.waveDuration - 2f) break;
-                tl0 = game.TimeLeft; Teleport(cc, c + runDir * 40f); landT = 1f;
+                tl0 = game.TimeLeft; Teleport(fp, c + runDir * 40f); landT = 1f;
                 playPhase = 4; playT = t; break;
             case 4:
                 if (t > playT + 2.5f && landT >= 0f) { ScreenCapture.CaptureScreenshot(ShotDir + "/play_paused.png"); landT = -1f; }   // one frame before the check
@@ -108,7 +111,7 @@ public static partial class EditorAutomation
                 tl1 = game.TimeLeft;
                 Log("  playtest outside the circle for 3 s: timer " + F(tl0) + " -> " + F(tl1) + ", in zone " + game.InZone + ", bots alive " + game.Alive + ", spawned " + game.Spawned);
                 if (game.InZone || Mathf.Abs(tl1 - tl0) > 0.05f) { Log("PLAYTEST_FAILED: progress did not stop outside the circle"); playPhase = 9; playT = t; break; }
-                Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                Teleport(fp, c + new Vector3(0.5f, 0f, 0.5f));
                 playPhase = 5; playT = t; break;
             case 5:
                 if (t < playT + 2f) break;
@@ -232,7 +235,7 @@ public static partial class EditorAutomation
                 if (t < playT + 0.4f) break;
                 inv.ClearTestInput(); fp.Pitch = 0f;
                 // a target bot that stands still 14 m ahead, for hits while standing, sprinting backwards and walking backwards
-                Teleport(cc, c - runDir * 2f); fp.transform.rotation = Quaternion.LookRotation(runDir);
+                Teleport(fp, c - runDir * 2f); fp.transform.rotation = Quaternion.LookRotation(runDir);
                 var tgt = UnityEngine.Object.Instantiate(game.botPrefab, c + runDir * 12f, Quaternion.LookRotation(-runDir));
                 tgt.Init(fp.transform, 1e7f, 0f, 0f, 1f, Color.white); tgt.name = "TestTarget";
                 moveIdx = 0; landT = -1f; playPhase = 20; playT = t; break;
@@ -267,15 +270,15 @@ public static partial class EditorAutomation
                 ownBlocked = 0; ownTicks = 0;
                 hitRates[moveIdx] = shots > 0 ? hits / shots : 0f;
                 inv.SetTestInput(false, false); fp.ClearTestInput(); landT = -1f;
-                if (++moveIdx < 3) { Teleport(cc, c - runDir * 2f); playT = t; break; }
-                tb.Die(false); inv.ClearTestInput(); fp.Pitch = 0f; Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                if (++moveIdx < 3) { Teleport(fp, c - runDir * 2f); playT = t; break; }
+                tb.Die(false); inv.ClearTestInput(); fp.Pitch = 0f; Teleport(fp, c + new Vector3(0.5f, 0f, 0.5f));
                 if (Mathf.Min(hitRates[0], Mathf.Min(hitRates[1], hitRates[2])) < 0.9f) { Log("PLAYTEST_FAILED: rounds miss a target in the crosshair while moving"); playPhase = 9; playT = t; break; }
                 playPhase = 21; break;
             }
             case 21:                                                       // movement: sprint down the hill side, then up it
             {
                 fp.ClearSpeedBoost();
-                Teleport(cc, c + runDir * 16f); fp.transform.rotation = Quaternion.LookRotation(runDir);
+                Teleport(fp, c + runDir * 16f); fp.transform.rotation = Quaternion.LookRotation(runDir);
                 fp.SetTestInput(Vector3.forward, true, false);
                 moveTicks = 0; groundTicks = 0; speedSum = 0f; jumpedOk = false; startPos = fp.transform.position;
                 playPhase = 22; playT = t; landT = -1f; break;
@@ -298,7 +301,7 @@ public static partial class EditorAutomation
                 float grade = (startPos.y - endPos.y) / Mathf.Max(0.1f, horiz) * 100f, onGround = groundTicks / (float)Mathf.Max(1, moveTicks), v = horiz / Mathf.Max(0.01f, speedSum);
                 Log("  playtest downhill: grade ~" + F(grade) + " %, on the ground " + F(onGround * 100f) + " % of ticks, speed over the ground " + F(v) + " m/s (sprint " + F(fp.sprintSpeed) + "), jump " + (jumpedOk ? "done" : "MISSING"));
                 if (onGround < 0.95f || v < fp.sprintSpeed * 0.93f || v > fp.sprintSpeed * 1.05f || !jumpedOk) { Log("PLAYTEST_FAILED: running downhill is not the same as on the flat"); playPhase = 9; playT = t; break; }
-                Teleport(cc, c + runDir * 34f); fp.transform.rotation = Quaternion.LookRotation(-runDir);
+                Teleport(fp, c + runDir * 34f); fp.transform.rotation = Quaternion.LookRotation(-runDir);
                 fp.SetTestInput(Vector3.forward, true, false);
                 moveTicks = 0; speedSum = 0f; startPos = fp.transform.position;
                 playPhase = 23; playT = t; break;
@@ -310,7 +313,7 @@ public static partial class EditorAutomation
                 float horiz = Vector2.Distance(new Vector2(startPos.x, startPos.z), new Vector2(fp.transform.position.x, fp.transform.position.z));
                 float v = horiz / Mathf.Max(0.01f, t - tl1), grade = (fp.transform.position.y - startPos.y) / Mathf.Max(0.1f, horiz) * 100f;
                 Log("  playtest uphill: grade ~" + F(grade) + " %, speed over the ground " + F(v) + " m/s (" + F(horiz) + " m in " + F(t - tl1) + " s), planar velocity " + F(fp.PlanarVelocity.magnitude));
-                fp.ClearTestInput(); Teleport(cc, c + new Vector3(0.5f, 0f, 0.5f));
+                fp.ClearTestInput(); Teleport(fp, c + new Vector3(0.5f, 0f, 0.5f));
                 if (v < fp.sprintSpeed * 0.93f) { Log("PLAYTEST_FAILED: running uphill is slower than on the flat"); playPhase = 9; playT = t; break; }
                 playPhase = 7; break;
             }
@@ -445,6 +448,8 @@ public static partial class EditorAutomation
             else if (cmd == "gameplay") SupplySetup.InstallInOpenScene();
             else if (cmd == "supplies-view") SupplySetup.ViewShots();
             else if (cmd == "hud") HudSetup.InstallInOpenScene();
+            else if (cmd == "player") PlayerSetup.InstallInOpenScene();
+            else if (cmd == "movetest") { moveTestRunner = null; ArmPlaytest("movetest"); }
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }

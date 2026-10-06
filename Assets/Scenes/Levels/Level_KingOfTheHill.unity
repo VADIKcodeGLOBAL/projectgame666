@@ -20454,11 +20454,13 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 891331418}
-  - component: {fileID: 891331416}
   - component: {fileID: 891331417}
   - component: {fileID: 891331415}
   - component: {fileID: 891331414}
   - component: {fileID: 891331419}
+  - component: {fileID: 891331422}
+  - component: {fileID: 891331421}
+  - component: {fileID: 891331420}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -20579,40 +20581,13 @@ MonoBehaviour:
   walkSpeed: 5.5
   sprintSpeed: 8.5
   jumpHeight: 1.1
-  gravity: 22
   groundAccel: 45
   airAccel: 10
   mouseSensitivity: 2.2
-  snapDistance: 0.6
   coyoteTime: 0.12
   jumpBuffer: 0.12
   killHeight: -30
   lookScale: 1
---- !u!143 &891331416
-CharacterController:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 891331412}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Height: 1.8
-  m_Radius: 0.35
-  m_SlopeLimit: 50
-  m_StepOffset: 0.4
-  m_SkinWidth: 0.08
-  m_MinMoveDistance: 0.001
-  m_Center: {x: 0, y: 0.9, z: 0}
 --- !u!114 &891331417
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -20664,6 +20639,78 @@ MonoBehaviour:
   voices: 8
   switchTime: 0.45
   scopeTime: 0.18
+--- !u!114 &891331420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 891331412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c790d70fdbe51f445b93fa10338a7815, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterMotor
+  maxSlope: 50
+  stepHeight: 0.4
+  snapDistance: 0.5
+  gravity: 22
+  skin: 0.01
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  smoothedChild: {fileID: 1497437708}
+  smoothSpeed: 2.5
+--- !u!54 &891331421
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 891331412}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 126
+  m_CollisionDetection: 0
+--- !u!136 &891331422
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 891331412}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.35
+  m_Height: 1.8
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.9, z: 0}
 --- !u!1001 &902442976
 PrefabInstance:
   m_ObjectHideFlags: 0
