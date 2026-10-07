@@ -27,7 +27,7 @@ MonoBehaviour:
   teams: 2
   spawnRadius: 190
   pathHalfWidth: 1.8
-  captureRadius: 12
+  captureRadius: 16
   captureTime: 8
   scoreToWin: 100
   forestDensity: 0.5

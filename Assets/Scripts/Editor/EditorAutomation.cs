@@ -454,6 +454,7 @@ public static partial class EditorAutomation
             else if (cmd == "cannontest") { moveTestRunner = null; ArmPlaytest("cannontest"); }
             else if (cmd == "cannon") CannonSetup.InstallInOpenScene();
             else if (cmd == "cannon-view") CannonSetup.ViewShots();
+            else if (cmd == "zone") KothMapGenerator.RebuildZoneInOpenScene();
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }

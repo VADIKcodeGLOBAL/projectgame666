@@ -1,17 +1,22 @@
 using UnityEngine;
 
-/// <summary>The circle on the summit: the wave timer runs only while the player is inside. The ring and the wall turn red while the player is outside.</summary>
+/// <summary>
+/// The circle on the summit: the wave timer runs only while the player is inside. While the player is outside, the floor ring,
+/// the wall and the flag fade to a pulsing red, and the ring and wall shaders brighten and run their animation faster.
+/// </summary>
 public class HillZone : MonoBehaviour
 {
-    public float radius = 12f;
+    public float radius = 16f;
     public float height = 10f;
     public Renderer[] tintRenderers;
     [ColorUsage(false, true)] public Color safeColor = new Color(0.25f, 0.95f, 1f);
     [ColorUsage(false, true)] public Color dangerColor = new Color(1.6f, 0.22f, 0.08f);
+    [Tooltip("Seconds to fade between the calm and the danger look.")] public float fadeTime = 0.35f;
+    [Tooltip("How much faster the ring and wall animate in danger (1 = twice as fast).")] public float dangerSpeedUp = 1.5f;
 
-    static readonly int ColorId = Shader.PropertyToID("_Color");
+    static readonly int ColorId = Shader.PropertyToID("_Color"), DangerId = Shader.PropertyToID("_Danger"), BoostId = Shader.PropertyToID("_Boost");
     MaterialPropertyBlock block;
-    float danger = -1f;
+    float target, shown = -1f, boost;
 
     public bool Contains(Vector3 p)
     {
@@ -20,22 +25,32 @@ public class HillZone : MonoBehaviour
     }
 
     /// <summary>0 = player inside, 1 = about to lose.</summary>
-    public void SetDanger(float t)
+    public void SetDanger(float t) { target = Mathf.Clamp01(t); }
+
+    void OnEnable() { shown = -1f; }
+
+    void Update()
     {
-        t = Mathf.Clamp01(t);
-        if (Mathf.Approximately(t, danger) || tintRenderers == null) return;
-        danger = t;
+        float dt = Time.deltaTime;
+        bool first = shown < 0f;
+        if (!first && shown == 0f && target == 0f) return;         // calm: nothing changes
+        shown = first ? target : Mathf.MoveTowards(shown, target, dt / Mathf.Max(0.01f, fadeTime));
+        boost += dt * dangerSpeedUp * shown;                       // extra shader time: speeds the animation up without a jump
+        Apply(Color.Lerp(safeColor, dangerColor, shown * (0.5f + 0.5f * Mathf.PingPong(Time.time * 4f, 1f))));
+    }
+
+    void Apply(Color c)
+    {
+        if (tintRenderers == null) return;
         if (block == null) block = new MaterialPropertyBlock();
-        Color c = Color.Lerp(safeColor, dangerColor, t > 0f ? 0.5f + 0.5f * Mathf.PingPong(Time.time * 4f, 1f) : 0f);
         foreach (var r in tintRenderers)
         {
             if (r == null) continue;
-            r.GetPropertyBlock(block); block.SetColor(ColorId, c); r.SetPropertyBlock(block);
+            r.GetPropertyBlock(block);
+            block.SetColor(ColorId, c); block.SetFloat(DangerId, shown); block.SetFloat(BoostId, boost);
+            r.SetPropertyBlock(block);
         }
-        if (t > 0f) danger = -1f;                     // keep pulsing: re-evaluate next frame
     }
-
-    void OnEnable() { danger = -1f; SetDanger(0f); }
 
     void OnDrawGizmos()
     {
