@@ -3,11 +3,14 @@ using UnityEngine;
 /// <summary>
 /// The player's weapons. With the mouse captured: LMB fire, R reload, RMB scope (weapons that have one),
 /// 1-4 or the mouse wheel to switch. Plays the shot sounds through a small pool of voices, gives picked-up magazines
-/// to a weapon and keeps the numbers the HUD shows.
+/// to a weapon and keeps the numbers the HUD shows. The weapons (with their arms) are a view model: the player camera does not
+/// draw them, viewCam draws them over the world with a field of view of its own.
 /// </summary>
 public class WeaponInventory : MonoBehaviour
 {
     public Camera cam;
+    [Tooltip("Draws the weapons and the arms (layer ViewModel) over the world: they never sink into a wall, and the FOV setting, the sprint and the scope do not stretch them.")] public Camera viewCam;
+    [Tooltip("Field of view of the view model camera, degrees (vertical).")] public float viewModelFov = 80f;
     public Weapon[] weapons;
     public AudioSource audioSource;
     [Tooltip("Shot sounds playing at once; the oldest one is cut when a new round needs a voice.")] public int voices = 8;
@@ -88,9 +91,10 @@ public class WeaponInventory : MonoBehaviour
         Holstered = on;
         var w = Current;
         if (w != null) { w.CancelReload(); w.gameObject.SetActive(!on); }
+        if (viewCam != null) viewCam.enabled = !on;                         // the cannon's camera has the screen alone
         Aim = 0f; triggerArmed = false; prevHeld = true; sprintFov = 0f;
         if (cam != null) cam.fieldOfView = baseFov;
-        if (fp != null) fp.lookScale = 1f;
+        if (fp != null) { fp.lookScale = 1f; fp.ClearRecoil(); }            // no kick or settling left over for the cannon
     }
 
     public void Select(int index)
@@ -153,6 +157,7 @@ public class WeaponInventory : MonoBehaviour
             if (fp != null) fp.lookScale = fov / baseFov;                     // the same mouse move turns the view less when zoomed in; the sprint widening leaves it alone
             cam.fieldOfView = fov + sprintFov * (1f - Aim) * sprintFovKick * GameSettings.FovEffects;  // FOV sliders show at once, also in the pause menu; the scope takes the widening away
         }
+        if (viewCam != null) viewCam.fieldOfView = viewModelFov;
 
         w.Tick(held, pressed, pending < 0 && raise > 0.7f, cam, Aim);
 
@@ -187,7 +192,7 @@ public class WeaponInventory : MonoBehaviour
     {
         ShotsFired++;
         if (hit) { Hits++; LastHitTime = Time.time; }
-        if (fp != null) fp.AddRecoil(w.recoil * (1f - 0.5f * Aim));
+        if (fp != null) fp.AddRecoil(w.LastKick.y * (1f - 0.5f * Aim), w.LastKick.x * (1f - 0.5f * Aim));   // grows through a burst (Weapon.Kick)
         if (voicePool != null && w.shotClips != null && w.shotClips.Length > 0)
         {
             var a = voicePool[nextVoice]; nextVoice = (nextVoice + 1) % voicePool.Length;
