@@ -1,19 +1,19 @@
 using UnityEngine;
 
 /// <summary>
-/// Player settings, kept in PlayerPrefs: overall volume, music volume, shot volume, field of view, mouse sensitivity.
-/// Read by AudioListener (overall), MusicPlayer, WeaponInventory (shots and FOV), SimpleFirstPersonController and FieldCannon (mouse).
+/// Player settings, kept in PlayerPrefs: overall volume, music volume, shot volume, field of view, FOV effects, mouse sensitivity.
+/// Read by AudioListener (overall), MusicPlayer, WeaponInventory (shots, FOV and FOV effects), SimpleFirstPersonController and FieldCannon (mouse).
 /// Changed from SettingsMenu.
 /// </summary>
 public static class GameSettings
 {
-    public const float DefaultMaster = 1f, DefaultMusic = 0.6f, DefaultShots = 1f, DefaultFov = 75f, DefaultMouse = 1f;
-    public const float MinFov = 60f, MaxFov = 110f, MinMouse = 0.1f, MaxMouse = 3f;
+    public const float DefaultMaster = 1f, DefaultMusic = 0.6f, DefaultShots = 1f, DefaultFov = 75f, DefaultMouse = 1f, DefaultFovEffects = 1f;
+    public const float MinFov = 60f, MaxFov = 110f, MinMouse = 0.1f, MaxMouse = 3f, MaxFovEffects = 2f;
 
     const string KeyMaster = "settings.volume.master", KeyMusic = "settings.volume.music", KeyShots = "settings.volume.shots", KeyFov = "settings.fov";
-    const string KeyMouse = "settings.mouse.sensitivity";
+    const string KeyMouse = "settings.mouse.sensitivity", KeyFovEffects = "settings.fov.effects";
 
-    static float master = DefaultMaster, music = DefaultMusic, shots = DefaultShots, fov = DefaultFov, mouse = DefaultMouse;
+    static float master = DefaultMaster, music = DefaultMusic, shots = DefaultShots, fov = DefaultFov, mouse = DefaultMouse, fovEffects = DefaultFovEffects;
 
     /// <summary>0..1, everything the player hears.</summary>
     public static float MasterVolume { get { return master; } set { master = Clamp(value, 0f, 1f, DefaultMaster); AudioListener.volume = master; } }
@@ -23,6 +23,8 @@ public static class GameSettings
     public static float ShotVolume { get { return shots; } set { shots = Clamp(value, 0f, 1f, DefaultShots); } }
     /// <summary>Vertical field of view of the player camera, degrees.</summary>
     public static float Fov { get { return fov; } set { fov = Clamp(value, MinFov, MaxFov, DefaultFov); } }
+    /// <summary>Strength of the FOV effects (the view widening while sprinting), 0 = off, 1 = as designed.</summary>
+    public static float FovEffects { get { return fovEffects; } set { fovEffects = Clamp(value, 0f, MaxFovEffects, DefaultFovEffects); } }
     /// <summary>Multiplier of the mouse look (1 = the controller's own speed), on top of the zoom scaling.</summary>
     public static float MouseSensitivity { get { return mouse; } set { mouse = Clamp(value, MinMouse, MaxMouse, DefaultMouse); } }
 
@@ -43,6 +45,7 @@ public static class GameSettings
         MusicVolume = Read(KeyMusic, DefaultMusic);
         ShotVolume = Read(KeyShots, DefaultShots);
         Fov = Read(KeyFov, DefaultFov);
+        FovEffects = Read(KeyFovEffects, DefaultFovEffects);
         MouseSensitivity = Read(KeyMouse, DefaultMouse);
     }
 
@@ -50,13 +53,13 @@ public static class GameSettings
     {
         PlayerPrefs.SetFloat(KeyMaster, master); PlayerPrefs.SetFloat(KeyMusic, music);
         PlayerPrefs.SetFloat(KeyShots, shots); PlayerPrefs.SetFloat(KeyFov, fov);
-        PlayerPrefs.SetFloat(KeyMouse, mouse);
+        PlayerPrefs.SetFloat(KeyFovEffects, fovEffects); PlayerPrefs.SetFloat(KeyMouse, mouse);
         PlayerPrefs.Save();
     }
 
     public static void ResetToDefaults()
     {
         MasterVolume = DefaultMaster; MusicVolume = DefaultMusic; ShotVolume = DefaultShots; Fov = DefaultFov;
-        MouseSensitivity = DefaultMouse;
+        FovEffects = DefaultFovEffects; MouseSensitivity = DefaultMouse;
     }
 }

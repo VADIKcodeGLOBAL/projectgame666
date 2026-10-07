@@ -87,6 +87,12 @@ public static partial class EditorAutomation
             case 1:
                 if (t < tA + 0.8f) break;
                 vRun = fp.PlanarVelocity.magnitude;
+                {
+                    var inv = fp.GetComponent<WeaponInventory>();
+                    float want = GameSettings.Fov + inv.sprintFovKick * GameSettings.FovEffects;
+                    Log("  playtest sprint fov: " + F(inv.cam.fieldOfView) + " (base " + F(GameSettings.Fov) + ", want " + F(want) + ", effects " + F(GameSettings.FovEffects) + ")");
+                    if (Mathf.Abs(inv.cam.fieldOfView - want) > 0.5f) { Log("PLAYTEST_FAILED: the view does not widen while sprinting"); playPhase = 9; playT = t; break; }
+                }
                 fp.SetTestInput(Vector3.forward, true, true);                       // jump with Shift still held
                 playPhase = 2; tB = t; wasAir = false; landT = -1f; vAir = 0f; break;
             case 2:
@@ -342,7 +348,7 @@ public static partial class EditorAutomation
                 var menu = UnityEngine.Object.FindFirstObjectByType<SettingsMenu>();
                 bool paused = Time.timeScale == 0f && SettingsMenu.IsOpen && Cursor.lockState != CursorLockMode.Locked;
                 menu.Close();
-                Log("  playtest settings menu: paused " + paused + ", resumed " + (Time.timeScale == 1f && !SettingsMenu.IsOpen) + ", fov " + F(GameSettings.Fov) + ", mouse " + F(GameSettings.MouseSensitivity) + ", volumes " + F(GameSettings.MasterVolume) + "/" + F(GameSettings.MusicVolume) + "/" + F(GameSettings.ShotVolume) + ", music tracks " + menu.music.TrackCount);
+                Log("  playtest settings menu: paused " + paused + ", resumed " + (Time.timeScale == 1f && !SettingsMenu.IsOpen) + ", fov " + F(GameSettings.Fov) + ", fov effects " + F(GameSettings.FovEffects) + ", mouse " + F(GameSettings.MouseSensitivity) + ", volumes " + F(GameSettings.MasterVolume) + "/" + F(GameSettings.MusicVolume) + "/" + F(GameSettings.ShotVolume) + ", music tracks " + menu.music.TrackCount);
                 Log(paused && Time.timeScale == 1f ? "PLAYTEST_OK" : "PLAYTEST_FAILED: the settings menu does not pause and resume");
                 playPhase = 9; playT = t; break;
             }

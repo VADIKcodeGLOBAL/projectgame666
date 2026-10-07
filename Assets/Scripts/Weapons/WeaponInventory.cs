@@ -21,6 +21,10 @@ public class WeaponInventory : MonoBehaviour
     [Tooltip("Side lean of the gun into a turn, part of the tilt.")] public float swayRoll = 0.6f;
     [Tooltip("How fast the gun follows the view and comes back to rest, 1/s; lower is softer and lazier.")] public float swaySmoothing = 9f;
 
+    [Header("Sprint FOV")]
+    [Tooltip("The view widens this much at full sprint speed, degrees; the player's FOV effects setting multiplies it (0 = off).")] public float sprintFovKick = 7f;
+    [Tooltip("How fast the widening follows the sprint, 1/s; lower is softer.")] public float sprintFovSmoothing = 6f;
+
     public static WeaponInventory Instance { get; private set; }
     /// <summary>The player's components, cached for the supplies.</summary>
     public PlayerHealth Health { get; private set; }
@@ -38,7 +42,7 @@ public class WeaponInventory : MonoBehaviour
     public float PickupTime { get; private set; } = -10f;
 
     SimpleFirstPersonController fp;
-    float baseFov = 70f, raise = 1f, bobT, lastYaw, lastPitch;
+    float baseFov = 70f, raise = 1f, bobT, lastYaw, lastPitch, sprintFov;    // sprintFov: 0..1 how far the sprint widening is in
     Vector2 sway;                                                          // x yaw, y pitch of the gun against the view, degrees
     int pending = -1;
     bool triggerArmed, prevHeld, testActive, testTrigger, testAim;
@@ -84,7 +88,7 @@ public class WeaponInventory : MonoBehaviour
         Holstered = on;
         var w = Current;
         if (w != null) { w.CancelReload(); w.gameObject.SetActive(!on); }
-        Aim = 0f; triggerArmed = false; prevHeld = true;
+        Aim = 0f; triggerArmed = false; prevHeld = true; sprintFov = 0f;
         if (cam != null) cam.fieldOfView = baseFov;
         if (fp != null) fp.lookScale = 1f;
     }
@@ -140,10 +144,14 @@ public class WeaponInventory : MonoBehaviour
         baseFov = GameSettings.Fov;                                        // from the settings menu
         bool aiming = aimHeld && w.hasScope && !w.IsReloading && pending < 0 && raise > 0.99f;
         Aim = Mathf.MoveTowards(Aim, aiming ? 1f : 0f, Time.deltaTime / Mathf.Max(0.01f, scopeTime));
+        // sprint: the view widens a little with the speed above walking; pressing into a wall widens nothing
+        float run = fp != null && fp.IsSprinting ? Mathf.InverseLerp(fp.walkSpeed, fp.sprintSpeed, fp.PlanarVelocity.magnitude) : 0f;
+        sprintFov = Mathf.Lerp(sprintFov, run, 1f - Mathf.Exp(-sprintFovSmoothing * Time.deltaTime));
         if (cam != null)
         {
-            cam.fieldOfView = w.hasScope ? Mathf.Lerp(baseFov, w.scopeFov, Aim * Aim) : baseFov;      // FOV slider shows at once, also in the pause menu
-            if (fp != null) fp.lookScale = cam.fieldOfView / baseFov;         // the same mouse move turns the view less when zoomed in
+            float fov = w.hasScope ? Mathf.Lerp(baseFov, w.scopeFov, Aim * Aim) : baseFov;
+            if (fp != null) fp.lookScale = fov / baseFov;                     // the same mouse move turns the view less when zoomed in; the sprint widening leaves it alone
+            cam.fieldOfView = fov + sprintFov * (1f - Aim) * sprintFovKick * GameSettings.FovEffects;  // FOV sliders show at once, also in the pause menu; the scope takes the widening away
         }
 
         w.Tick(held, pressed, pending < 0 && raise > 0.7f, cam, Aim);
