@@ -285,7 +285,7 @@ public class FieldCannon : MonoBehaviour
         bool zoom = locked && Input.GetMouseButton(1);
         float fovTarget = zoom ? zoomFov : GameSettings.Fov;
         gunnerCamera.fieldOfView = Mathf.MoveTowards(gunnerCamera.fieldOfView, fovTarget, 300f * dt);
-        float sens = (user != null ? user.mouseSensitivity : 2f) * lookSensitivity * 0.5f * gunnerCamera.fieldOfView / Mathf.Max(1f, GameSettings.Fov);
+        float sens = (user != null ? user.LookSensitivity : 2f * GameSettings.MouseSensitivity) * lookSensitivity * 0.5f * gunnerCamera.fieldOfView / Mathf.Max(1f, GameSettings.Fov);
         if (locked) { camYaw += Input.GetAxis("Mouse X") * sens; camPitch = Mathf.Clamp(camPitch - Input.GetAxis("Mouse Y") * sens, -45f, 40f); }
 
         // ---- the target: what is under the crosshair
@@ -421,8 +421,8 @@ public class FieldCannon : MonoBehaviour
         bool locked = Cursor.lockState == CursorLockMode.Locked;
         float push = testPushActive ? testPush : Input.GetAxisRaw("Vertical");
         float turn = testPushActive ? testTurn : Input.GetAxisRaw("Horizontal");
-        float mouseTurn = locked && !testPushActive ? Input.GetAxis("Mouse X") * user.mouseSensitivity * 0.5f : 0f;
-        if (locked && !testPushActive) user.Pitch = user.Pitch - Input.GetAxis("Mouse Y") * user.mouseSensitivity;
+        float mouseTurn = locked && !testPushActive ? Input.GetAxis("Mouse X") * user.LookSensitivity * 0.5f : 0f;
+        if (locked && !testPushActive) user.Pitch = user.Pitch - Input.GetAxis("Mouse Y") * user.LookSensitivity;
 
         pushVel = Mathf.MoveTowards(pushVel, Mathf.Clamp(push, -1f, 1f) * pushSpeed * (push < 0f ? 0.6f : 1f), pushAccel * dt);
         float dYaw = Mathf.Clamp(turn, -1f, 1f) * turnSpeed * dt * (Mathf.Abs(pushVel) > 0.1f ? 1f : 0.7f) + mouseTurn;

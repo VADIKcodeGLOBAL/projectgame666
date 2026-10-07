@@ -28,7 +28,7 @@ public class HudView : MonoBehaviour
     public CanvasGroup pickupGroup;
     public Text pickup;
     public GameObject crosshair;
-    public Image[] crosshairBars;
+    public Crosshair crosshairGraphic;
 
     [Header("Bottom left")]
     public RectTransform hpFill;
@@ -165,11 +165,9 @@ public class HudView : MonoBehaviour
         var pk = Node("Pickup", mid, new Vector2(0.5f, 0.38f), C, Vector2.zero, new Vector2(1200f, 30f));
         v.pickupGroup = pk.gameObject.AddComponent<CanvasGroup>(); v.pickupGroup.alpha = 0f; v.pickupGroup.blocksRaycasts = false; v.pickupGroup.interactable = false;
         v.pickup = Label("Text", pk, C, C, Vector2.zero, new Vector2(1200f, 30f), 22, TextAnchor.MiddleCenter, Gold);
-        var ch = Layer("Crosshair", root); v.crosshair = ch.gameObject;          // its own canvas: the hit colour flashes often
-        Color cw = new Color(1f, 1f, 1f, 0.85f);
-        v.crosshairBars = new[] {
-            Box("L", ch, C, C, new Vector2(-6f, 0f), new Vector2(6f, 2f), cw), Box("R", ch, C, C, new Vector2(6f, 0f), new Vector2(6f, 2f), cw),
-            Box("U", ch, C, C, new Vector2(0f, 6f), new Vector2(2f, 6f), cw), Box("D", ch, C, C, new Vector2(0f, -6f), new Vector2(2f, 6f), cw) };
+        var ch = Layer("Crosshair", root); v.crosshair = ch.gameObject;          // its own canvas: the gap and the hit marker change often
+        v.crosshairGraphic = Stretch("Cross", ch).gameObject.AddComponent<Crosshair>();   // stretched: its centre is the screen centre
+        v.crosshairGraphic.color = new Color(1f, 1f, 1f, 0.92f); v.crosshairGraphic.raycastTarget = false;
 
         // ---- bottom left: health, speed boost, ammo, controls
         var bl = Layer("BottomLeft", root);

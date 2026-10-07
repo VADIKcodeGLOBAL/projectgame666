@@ -15,12 +15,15 @@ public class SimpleFirstPersonController : MonoBehaviour
     public float sprintSpeed = 8.5f;
     public float jumpHeight = 1.1f;
     [Tooltip("How fast the speed follows the input on the ground / in the air, m/s².")] public float groundAccel = 45f, airAccel = 10f;
-    public float mouseSensitivity = 2.2f;
+    [Tooltip("Base mouse look speed; the player's setting (GameSettings.MouseSensitivity) multiplies it.")] public float mouseSensitivity = 2.2f;
     [Tooltip("A jump still works this long after the ground was lost, s.")] public float coyoteTime = 0.12f;
     [Tooltip("A jump pressed this long before landing is done on landing, s.")] public float jumpBuffer = 0.12f;
     [Tooltip("Falling below this height puts the player back where they started.")] public float killHeight = -30f;
 
     [Tooltip("Multiplier of the mouse look, set by the weapons (lower while zoomed in).")] public float lookScale = 1f;
+
+    /// <summary>Mouse look speed with the player's setting from the settings menu, without the zoom scaling.</summary>
+    public float LookSensitivity { get { return mouseSensitivity * GameSettings.MouseSensitivity; } }
 
     public CharacterMotor Motor { get { if (motor == null) motor = GetComponent<CharacterMotor>(); return motor; } }
     public Vector3 PlanarVelocity { get { return Motor.PlanarVelocity; } }
@@ -68,7 +71,7 @@ public class SimpleFirstPersonController : MonoBehaviour
 
         if (Cursor.lockState == CursorLockMode.Locked)
         {
-            float sens = mouseSensitivity * lookScale;
+            float sens = LookSensitivity * lookScale;
             transform.Rotate(0f, Input.GetAxis("Mouse X") * sens, 0f);
             Pitch = pitch - Input.GetAxis("Mouse Y") * sens;
         }

@@ -342,7 +342,7 @@ public static partial class EditorAutomation
                 var menu = UnityEngine.Object.FindFirstObjectByType<SettingsMenu>();
                 bool paused = Time.timeScale == 0f && SettingsMenu.IsOpen && Cursor.lockState != CursorLockMode.Locked;
                 menu.Close();
-                Log("  playtest settings menu: paused " + paused + ", resumed " + (Time.timeScale == 1f && !SettingsMenu.IsOpen) + ", fov " + F(GameSettings.Fov) + ", volumes " + F(GameSettings.MasterVolume) + "/" + F(GameSettings.MusicVolume) + "/" + F(GameSettings.ShotVolume) + ", music tracks " + menu.music.TrackCount);
+                Log("  playtest settings menu: paused " + paused + ", resumed " + (Time.timeScale == 1f && !SettingsMenu.IsOpen) + ", fov " + F(GameSettings.Fov) + ", mouse " + F(GameSettings.MouseSensitivity) + ", volumes " + F(GameSettings.MasterVolume) + "/" + F(GameSettings.MusicVolume) + "/" + F(GameSettings.ShotVolume) + ", music tracks " + menu.music.TrackCount);
                 Log(paused && Time.timeScale == 1f ? "PLAYTEST_OK" : "PLAYTEST_FAILED: the settings menu does not pause and resume");
                 playPhase = 9; playT = t; break;
             }
