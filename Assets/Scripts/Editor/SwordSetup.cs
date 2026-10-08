@@ -4,21 +4,29 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// The bastard sword in the player's hands: the model made by Source/Blender/Scripts/sword_model.py, steel / guard / leather
-/// materials, turned so that the blade runs along +Y and its flat faces +Z (MeleeWeapon poses it that way), a trail at the tip.
-/// Called by WeaponSetup.BuildPlayerWeapons (command "weapons", the map generator).
+/// The bastard sword in the player's hands: the artist's model (Sword.rar in Assets/Art/Weapons/Models/source/source) made ready
+/// by Source/Blender/Scripts/sword_import.py (1.23 m, origin at the leading hand), material M_Sword (ProjectGame/WeaponPBR with the
+/// Sword_* textures; the normal map is baked for DirectX), turned so that the blade runs along +Y and its flat faces +Z
+/// (MeleeWeapon poses it that way), a trail at the tip. Called by WeaponSetup.BuildPlayerWeapons (command "weapons", the map generator).
 /// </summary>
 public static class SwordSetup
 {
-    const string ModelPath = "Assets/Art/Weapons/Sword/Models/BastardSword.fbx";
+    const string ModelPath = "Assets/Art/Weapons/Sword/Models/Sword.fbx";
+    const string TexDir = WeaponSetup.ModelDir + "/source/textures";
     const string MatDir = "Assets/Art/Weapons/Materials";
 
-    static Material Lit(string name, Color c, float metallic, float gloss)
+    static Material SwordMat()
     {
-        string path = MatDir + "/" + name + ".mat";
+        string path = MatDir + "/M_Sword.mat";
+        var sh = Shader.Find("ProjectGame/WeaponPBR");
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (m == null) { m = new Material(Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
-        m.SetColor("_Color", c); m.SetFloat("_Metallic", metallic); m.SetFloat("_Glossiness", gloss);
+        if (m == null) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); } else m.shader = sh;
+        m.SetTexture("_MainTex", WeaponSetup.Tex(TexDir + "/Sword_Base_Color.png", false, false, 2048));
+        m.SetTexture("_BumpMap", WeaponSetup.Tex(TexDir + "/Sword_Normal_DirectX.png", true, true, 2048, true));
+        m.SetTexture("_MetallicMap", WeaponSetup.Tex(TexDir + "/Sword_Metallic.png", true, false, 1024));
+        m.SetTexture("_RoughnessMap", WeaponSetup.Tex(TexDir + "/Sword_Roughness.png", true, false, 1024));
+        m.SetTexture("_OcclusionMap", WeaponSetup.Tex(TexDir + "/Sword_occlusion.png", true, false, 1024));
+        m.SetColor("_EmissionColor", Color.black);
         EditorUtility.SetDirty(m);
         return m;
     }
@@ -26,12 +34,10 @@ public static class SwordSetup
     public static MeleeWeapon Build(Transform pivot, WeaponSetup.Fx fx, StringBuilder log)
     {
         var mi = AssetImporter.GetAtPath(ModelPath) as ModelImporter;
-        if (mi == null) throw new System.Exception("sword model not found: " + ModelPath + " (run sword_model.py)");
+        if (mi == null) throw new System.Exception("sword model not found: " + ModelPath + " (run sword_import.py)");
         mi.animationType = ModelImporterAnimationType.None; mi.importAnimation = false; mi.importCameras = false; mi.importLights = false;
         mi.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
-        mi.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), "Sword_Blade"), Lit("M_Sword_Blade", new Color(0.80f, 0.81f, 0.84f), 1f, 0.8f));
-        mi.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), "Sword_Guard"), Lit("M_Sword_Guard", new Color(0.36f, 0.34f, 0.31f), 0.9f, 0.55f));
-        mi.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), "Sword_Grip"), Lit("M_Sword_Grip", new Color(0.24f, 0.14f, 0.075f), 0f, 0.3f));
+        mi.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), "Sword"), SwordMat());
         mi.SaveAndReimport();
         var asset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
 
@@ -62,7 +68,8 @@ public static class SwordSetup
         var sword = root.AddComponent<MeleeWeapon>();
         sword.displayName = "Bastard sword"; sword.slotName = "Sword"; sword.trail = trail;
         log.Append("  " + sword.displayName + ": " + b.size.ToString("F3") + " m, " + r.GetComponent<MeshFilter>().sharedMesh.triangles.Length / 3
-                   + " tris, blade along model axis " + "XYZ"[along] + (bladeDir[along] > 0f ? "+" : "-") + ", flat " + "XYZ"[thin] + "\n");
+                   + " tris, material " + r.sharedMaterial.name + ", blade along model axis " + "XYZ"[along] + (bladeDir[along] > 0f ? "+" : "-")
+                   + ", flat " + "XYZ"[thin] + "\n");
         root.transform.SetParent(pivot, false);
         sword.PutAtRest();
         return sword;

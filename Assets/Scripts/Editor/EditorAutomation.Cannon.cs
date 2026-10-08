@@ -132,11 +132,11 @@ public static partial class EditorAutomation
         Check(Mathf.Abs(moved - want) < want * 0.15f && worstGround < 0.25f && worstHandle < 0.3f,
               "pushed 1.5 s: " + F3(moved) + " m (expected ~" + F3(want) + "), on the ground within " + F3(worstGround) + " m, player behind within " + F3(worstHandle) + " m");
         cannon.SetTestPush(0f, 0f); yield return Wait(0.8f);             // rolled to a stop first
-        float y0 = cannon.transform.eulerAngles.y;
+        float y0 = cannon.transform.eulerAngles.y; t0 = Time.time;
         cannon.SetTestPush(0f, 1f);
-        yield return Wait(1f);
-        float turned = Mathf.DeltaAngle(y0, cannon.transform.eulerAngles.y), wantTurn = cannon.turnSpeed * 0.7f;
-        Check(Mathf.Abs(turned - wantTurn) < wantTurn * 0.25f, "turned on the spot 1 s: " + turned.ToString("0.0") + " deg (expected ~" + wantTurn.ToString("0.0") + ")");
+        yield return Wait(1f);                                          // a slow editor tick can make it longer: the rate is what counts
+        float secs = Time.time - t0, turned = Mathf.DeltaAngle(y0, cannon.transform.eulerAngles.y), wantTurn = cannon.turnSpeed * 0.7f * secs;
+        Check(Mathf.Abs(turned - wantTurn) < wantTurn * 0.25f, "turned on the spot " + F3(secs) + " s: " + turned.ToString("0.0") + " deg (expected ~" + wantTurn.ToString("0.0") + ")");
         cannon.SetTestPush(0f, 0f); yield return Wait(0.2f);
         Vector3 f2 = cannon.transform.forward; f2.y = 0f; f2.Normalize();
         float frontReach = cannon.body.center.z + cannon.body.size.z * 0.5f;

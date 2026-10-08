@@ -90,7 +90,8 @@ public static class WeaponSetup
     }
 
     // ------------------------------------------------------------------ textures and materials
-    public static Texture2D Tex(string path, bool linear, bool normal, int maxSize = 2048)
+    /// <summary>Import settings of a material texture. directX: a normal map baked for DirectX (green = down), flipped on import.</summary>
+    public static Texture2D Tex(string path, bool linear, bool normal, int maxSize = 2048, bool directX = false)
     {
         if (string.IsNullOrEmpty(path)) return null;
         var ti = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -98,6 +99,7 @@ public static class WeaponSetup
         bool dirty = false;
         var type = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
         if (ti.textureType != type) { ti.textureType = type; dirty = true; }
+        if (normal && ti.flipGreenChannel != directX) { ti.flipGreenChannel = directX; dirty = true; }
         if (!normal && ti.sRGBTexture == linear) { ti.sRGBTexture = !linear; dirty = true; }
         if (ti.maxTextureSize != maxSize) { ti.maxTextureSize = maxSize; dirty = true; }
         if (dirty) ti.SaveAndReimport();

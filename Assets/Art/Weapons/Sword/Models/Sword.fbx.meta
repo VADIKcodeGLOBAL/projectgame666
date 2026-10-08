@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: bb9b33028f251f740af4f40d6e357064
+guid: 5e761efe21252db4da6746dd56b273d2
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -7,18 +7,8 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Sword_Blade
-    second: {fileID: 2100000, guid: 76f5b3a809e6d9d4b99bbc8691ce63d6, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Sword_Grip
-    second: {fileID: 2100000, guid: 9805bc81b1d598e4090be5deb63df68d, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Sword_Guard
-    second: {fileID: 2100000, guid: 5567f6ad14d0af6489472fd208ccff2c, type: 2}
+      name: Sword
+    second: {fileID: 2100000, guid: da80ce37f695f614bb476f4e35957649, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
