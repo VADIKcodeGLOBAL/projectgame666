@@ -104,6 +104,24 @@ public class EnemyBot : MonoBehaviour
         if (Health <= 0f) Die(true);
     }
 
+    const float KnockDeceleration = 14f;
+    Vector3 knock; float staggerUntil;
+    public bool IsStaggered { get { return Time.time < staggerUntil; } }
+
+    /// <summary>
+    /// A blow throws the bot back (horizontal velocity, m/s, slowing down) and puts it off balance for stagger seconds:
+    /// it neither walks nor strikes until it has caught itself (at least as long as the slide lasts).
+    /// </summary>
+    public void Knockback(Vector3 velocity, float stagger)
+    {
+        if (IsDying) return;
+        velocity.y = 0f;
+        knock = velocity;
+        float until = Time.time + Mathf.Max(stagger, velocity.magnitude / KnockDeceleration);
+        if (until > staggerUntil) staggerUntil = until;
+        if (nextAttack < staggerUntil) nextAttack = staggerUntil;
+    }
+
     public void Die(bool killedByPlayer)
     {
         if (IsDying) return;
@@ -177,6 +195,14 @@ public class EnemyBot : MonoBehaviour
         pendingDt += dt;
         if (dist > FullRateDistance && (Time.frameCount + lodSlot) % 3 != 0) return;
         dt = Mathf.Min(pendingDt, 0.1f); pendingDt = 0f;
+
+        if (knock.sqrMagnitude > 1e-4f)                                 // thrown back by a blow: slides, decelerating
+        {
+            vy = cc.isGrounded ? -2f : vy - 25f * dt;
+            cc.Move((knock + Vector3.up * vy) * dt);
+            knock = Vector3.MoveTowards(knock, Vector3.zero, KnockDeceleration * dt);
+        }
+        if (Time.time < staggerUntil) return;                           // off balance: no step and no blow
 
         Vector3 dir = dist > 0.01f ? to / dist : transform.forward;
         if (dist <= attackRange)

@@ -66,6 +66,7 @@ public static partial class EditorAutomation
         if (mode == "perftest") { PerfTick(); return; }
         if (mode == "movetest") { MoveTick(); return; }
         if (mode == "cannontest") { SuiteTick(CannonTests, "CANNONTEST"); return; }
+        if (mode == "swordtest") { SuiteTick(SwordTests, "SWORDTEST"); return; }
         float t = Time.timeSinceLevelLoad;
         if (t < 1.5f) return;
         var game = WaveSurvivalGame.Instance;
@@ -155,13 +156,13 @@ public static partial class EditorAutomation
                 Log("  playtest gun hitbox: top corner of the box " + (hitCorner ? "hit" : "MISSED") + " (old capsule: " + (capsuleCorner ? "hit" : "missed") + "), 6 cm beside the box " + (hitBeside ? "HIT" : "missed") + "; bot test " + us.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " us per round with " + EnemyBot.All.Count + " bots");
                 if (!hitCorner || hitBeside) { Log("PLAYTEST_FAILED: rounds do not follow the visible box"); playPhase = 9; playT = t; break; }
                 fp.Pitch = -80f;                                           // into the sky: the bursts hurt nobody
-                tl0 = inv.ShotsFired; tl1 = inv.Current.InMagazine; inv.SetTestInput(true, false);
+                tl0 = inv.ShotsFired; tl1 = inv.CurrentGun.InMagazine; inv.SetTestInput(true, false);
                 playPhase = 12; playT = t; landT = Time.frameCount; break;
             }
             case 12:                                                       // AK-47 held for 2 s: 20 rounds, 20 fewer in the magazine
             {
                 if (t < playT + 2f) break;
-                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.CurrentGun;
                 float fired = inv.ShotsFired - tl0, secs = t - playT, fps = (Time.frameCount - landT) / secs, want = ak.roundsPerSecond * secs;
                 Log("  playtest " + ak.displayName + " rate: " + fired + " rounds in " + F(secs) + " s at " + F(fps) + " fps (want " + F(want) + "), magazine " + tl1 + " -> " + ak.InMagazine);
                 if (Mathf.Abs(fired - want) > 1.5f || tl1 - ak.InMagazine != fired) { Log("PLAYTEST_FAILED: rate of fire or ammo count is off"); playPhase = 9; playT = t; break; }
@@ -169,14 +170,14 @@ public static partial class EditorAutomation
             }
             case 13:
             {
-                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.CurrentGun;
                 if (ak.IsReloading) { inv.SetTestInput(false, false); hp0 = t; playPhase = 14; break; }
                 if (t > playT + 3f) { Log("PLAYTEST_FAILED: an empty magazine did not start a reload (in magazine " + ak.InMagazine + ")"); playPhase = 9; playT = t; }
                 break;
             }
             case 14:
             {
-                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.CurrentGun;
                 if (ak.IsReloading) { if (t > hp0 + ak.reloadTime + 1f) { Log("PLAYTEST_FAILED: the reload never ends"); playPhase = 9; playT = t; } break; }
                 Log("  playtest reload: " + F(t - hp0) + " s (set " + F(ak.reloadTime) + "), magazine " + ak.InMagazine + "/" + ak.magazineSize + ", spare rounds " + tl1 + " -> " + ak.Reserve + " (magazines " + ak.Magazines + ")");
                 if (ak.InMagazine != ak.magazineSize || tl1 - ak.Reserve != ak.magazineSize) { Log("PLAYTEST_FAILED: the reload did not move one magazine"); playPhase = 9; playT = t; break; }
@@ -187,7 +188,7 @@ public static partial class EditorAutomation
             case 15:                                                       // walk into a magazine, then a medkit and a syringe
             {
                 if (t < playT + 0.6f) break;
-                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.Current;
+                var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.CurrentGun;
                 Log("  playtest pickup: magazines " + tl1 + " -> " + ak.Magazines + " (" + SupplyPickup.LastMessage + "), pickup prefab " + (game.ammoPickupPrefab != null));
                 if (ak.Magazines != tl1 + 1) { Log("PLAYTEST_FAILED: the magazine was not picked up"); playPhase = 9; playT = t; break; }
                 if (game.medkitPrefab == null || game.speedPrefab == null) { Log("PLAYTEST_FAILED: medkit or syringe prefab missing"); playPhase = 9; playT = t; break; }
@@ -255,7 +256,7 @@ public static partial class EditorAutomation
                     Vector3[] moves = { Vector3.zero, Vector3.back, Vector3.back };
                     bool[] sprint = { false, true, false };
                     fp.SetTestInput(moves[moveIdx], sprint[moveIdx], false); inv.SetTestInput(true, false);
-                    inv.Current.FillMagazine();                            // 30 rounds: no reload inside the 1.5 s run
+                    inv.CurrentGun.FillMagazine();                            // 30 rounds: no reload inside the 1.5 s run
                     tl0 = inv.ShotsFired; tl1 = inv.Hits; landT = t; break;
                 }
                 if (t < landT + 1.5f)
@@ -452,6 +453,7 @@ public static partial class EditorAutomation
             else if (cmd == "player") PlayerSetup.InstallInOpenScene();
             else if (cmd == "movetest") { moveTestRunner = null; ArmPlaytest("movetest"); }
             else if (cmd == "cannontest") { moveTestRunner = null; ArmPlaytest("cannontest"); }
+            else if (cmd == "swordtest") { moveTestRunner = null; ArmPlaytest("swordtest"); }
             else if (cmd == "cannon") CannonSetup.InstallInOpenScene();
             else if (cmd == "cannon-view") CannonSetup.ViewShots();
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());

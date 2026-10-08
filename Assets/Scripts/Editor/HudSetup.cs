@@ -16,7 +16,7 @@ public static class HudSetup
         if (hud.weapons != null && hud.weapons.weapons != null)
         {
             var names = new string[hud.weapons.weapons.Length];
-            for (int i = 0; i < names.Length; i++) names[i] = (i + 1) + " " + (hud.weapons.weapons[i] != null ? hud.weapons.weapons[i].displayName : "-");
+            for (int i = 0; i < names.Length; i++) names[i] = (i + 1) + " " + (hud.weapons.weapons[i] != null ? hud.weapons.weapons[i].SlotLabel : "-");
             v.BuildSlots(names);
         }
         hud.view = v;

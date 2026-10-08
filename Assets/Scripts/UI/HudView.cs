@@ -38,7 +38,7 @@ public class HudView : MonoBehaviour
     public RectTransform boostFill;
     public Text boostText;
     public GameObject ammo;
-    public Text weaponName, rounds, magSize, mags, status;
+    public Text weaponName, rounds, magSize, mags, magTitle, status;
     public Image[] magIcons;
     public GameObject reload;
     public RectTransform reloadFill;
@@ -185,7 +185,7 @@ public class HudView : MonoBehaviour
         v.weaponName = Label("Weapon", a, TL, TL, new Vector2(12f, -4f), new Vector2(260f, 22f), 15, TextAnchor.MiddleLeft, Gold, true, "AK-47");
         v.rounds = Label("Rounds", a, TL, TL, new Vector2(12f, -22f), new Vector2(110f, 46f), 40, TextAnchor.MiddleLeft, Color.white, true, "30");
         v.magSize = Label("MagazineSize", a, TL, TL, new Vector2(96f, -38f), new Vector2(80f, 26f), 15, TextAnchor.MiddleLeft, Grey, true, "/ 30");
-        Label("MagazinesTitle", a, TL, TL, new Vector2(168f, -24f), new Vector2(110f, 22f), 15, TextAnchor.MiddleLeft, Grey, true, "MAGAZINES");
+        v.magTitle = Label("MagazinesTitle", a, TL, TL, new Vector2(168f, -24f), new Vector2(110f, 22f), 15, TextAnchor.MiddleLeft, Grey, true, "MAGAZINES");
         v.mags = Label("Magazines", a, TL, TL, new Vector2(168f, -42f), new Vector2(110f, 30f), 20, TextAnchor.MiddleCenter, Color.white, true, "x 4");
         v.magIcons = new Image[MaxMagIcons];
         for (int i = 0; i < MaxMagIcons; i++) v.magIcons[i] = Box("Mag" + i, a, TL, TL, new Vector2(12f + i * 13f, -72f), new Vector2(9f, 14f), new Color(1f, 0.85f, 0.4f, 0.95f));
@@ -196,7 +196,7 @@ public class HudView : MonoBehaviour
         v.reload.SetActive(false);
         v.status = Label("Status", a, TL, TL, new Vector2(12f, -88f), new Vector2(260f, 18f), 14, TextAnchor.MiddleLeft, new Color(1f, 0.4f, 0.3f), true, "");
         v.help = Label("Controls", bl, BL, BL, new Vector2(24f, 2f), new Vector2(1600f, 20f), 15, TextAnchor.MiddleLeft, Color.white, false,
-            "LMB - capture mouse / fire    R - reload    RMB - scope    1-4 / wheel - weapon    WASD - move    Shift - sprint    Space - jump    Esc - menu / settings");
+            "LMB - capture mouse / fire / slash    R - reload    RMB - scope / heavy chop    1-5 / wheel - weapon    WASD - move    Shift - sprint    Space - jump    Esc - menu / settings");
 
         // ---- bottom right: weapon slots (filled by SurvivalHud) and kills
         var br = Layer("BottomRight", root);

@@ -35,7 +35,7 @@ public class SurvivalHud : MonoBehaviour
         if (weapons != null && weapons.weapons != null)
         {
             var names = new string[weapons.weapons.Length];
-            for (int i = 0; i < names.Length; i++) names[i] = (i + 1) + " " + (weapons.weapons[i] != null ? weapons.weapons[i].displayName : "-");
+            for (int i = 0; i < names.Length; i++) names[i] = (i + 1) + " " + (weapons.weapons[i] != null ? weapons.weapons[i].SlotLabel : "-");
             view.BuildSlots(names);
         }
     }
@@ -228,10 +228,24 @@ public class SurvivalHud : MonoBehaviour
 
     void UpdateAmmo()
     {
-        var w = weapons != null ? weapons.Current : null;
-        Show(view.ammo, w != null && FieldCannon.Active == null);
-        if (w == null) return;
-        if (tName.Changed(weapons.CurrentIndex)) view.weaponName.text = w.displayName.ToUpperInvariant();
+        var hw = weapons != null ? weapons.Current : null;
+        Show(view.ammo, hw != null && FieldCannon.Active == null);
+        if (hw == null) return;
+        if (tName.Changed(weapons.CurrentIndex)) view.weaponName.text = hw.displayName.ToUpperInvariant();
+
+        // a blade: no rounds and no magazines, the two blows instead
+        var w = hw as Weapon;
+        bool gun = w != null;
+        Show(view.rounds.gameObject, gun); Show(view.magSize.gameObject, gun); Show(view.mags.gameObject, gun);
+        if (view.magTitle != null) Show(view.magTitle.gameObject, gun);
+        if (!gun)
+        {
+            if (tIcons.Changed(-1)) foreach (var icon in view.magIcons) Show(icon.gameObject, false);
+            Show(view.reload, false);
+            if (tStatus.Changed(-1)) { view.status.text = "LMB - SLASH          RMB - HEAVY CHOP"; view.status.color = HudView.Grey; }
+            return;
+        }
+
         if (tRounds.Changed(w.InMagazine)) view.rounds.text = w.InMagazine.ToString();
         if (tMagSize.Changed(w.magazineSize)) view.magSize.text = "/ " + w.magazineSize;
         view.rounds.color = w.InMagazine == 0 ? HudView.Warn : w.InMagazine <= Mathf.Max(1, w.magazineSize / 4) ? new Color(1f, 0.7f, 0.3f) : Color.white;
@@ -253,6 +267,6 @@ public class SurvivalHud : MonoBehaviour
         Show(view.reload, w.IsReloading);
         if (w.IsReloading) Fill(view.reloadFill, w.ReloadProgress);
         int state = w.IsReloading ? 0 : w.InMagazine > 0 ? 1 : w.HasSpare ? 2 : 3;
-        if (tStatus.Changed(state)) view.status.text = state == 2 ? "R - RELOAD" : state == 3 ? "NO AMMO - FIND MAGAZINES" : "";
+        if (tStatus.Changed(state)) { view.status.text = state == 2 ? "R - RELOAD" : state == 3 ? "NO AMMO - FIND MAGAZINES" : ""; view.status.color = new Color(1f, 0.4f, 0.3f); }
     }
 }

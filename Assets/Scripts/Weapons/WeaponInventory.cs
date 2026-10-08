@@ -1,14 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// The player's weapons. With the mouse captured: LMB fire, R reload, RMB scope (weapons that have one),
-/// 1-4 or the mouse wheel to switch. Plays the shot sounds through a small pool of voices, gives picked-up magazines
+/// The player's weapons (guns and the sword, HandWeapon). With the mouse captured: LMB fire / slash, R reload,
+/// RMB scope (weapons that have one) or the weapon's own second attack (the sword's chop), 1-5 or the mouse wheel to switch. Plays the shot sounds through a small pool of voices, gives picked-up magazines
 /// to a weapon and keeps the numbers the HUD shows.
 /// </summary>
 public class WeaponInventory : MonoBehaviour
 {
     public Camera cam;
-    public Weapon[] weapons;
+    public HandWeapon[] weapons;
     public AudioSource audioSource;
     [Tooltip("Shot sounds playing at once; the oldest one is cut when a new round needs a voice.")] public int voices = 8;
     [Tooltip("Lower the old weapon + raise the new one, seconds.")] public float switchTime = 0.45f;
@@ -27,7 +27,9 @@ public class WeaponInventory : MonoBehaviour
     public PlayerHealth Health { get; private set; }
     public SimpleFirstPersonController Controller { get { return fp; } }
     public int CurrentIndex { get; private set; }
-    public Weapon Current { get { return weapons != null && weapons.Length > 0 ? weapons[CurrentIndex] : null; } }
+    public HandWeapon Current { get { return weapons != null && weapons.Length > 0 ? weapons[CurrentIndex] : null; } }
+    /// <summary>The weapon in hand if it is a gun (null for the sword).</summary>
+    public Weapon CurrentGun { get { return Current as Weapon; } }
     /// <summary>0..1 how far the scope is up.</summary>
     public float Aim { get; private set; }
     public bool IsScoped { get { return Aim > 0.85f; } }
@@ -42,7 +44,7 @@ public class WeaponInventory : MonoBehaviour
     float baseFov = 70f, raise = 1f, bobT, lastYaw, lastPitch;
     Vector2 turnRate;                                                      // smoothed turning of the view, °/s: x yaw (right +), y pitch (down +)
     int pending = -1;
-    bool triggerArmed, prevHeld, testActive, testTrigger, testAim;
+    bool triggerArmed, prevHeld, prevAlt, testActive, testTrigger, testAim;
     AudioSource[] voicePool; int nextVoice;
 
     int Target { get { return pending >= 0 ? pending : CurrentIndex; } }
@@ -55,7 +57,7 @@ public class WeaponInventory : MonoBehaviour
         if (fp != null) fp.Teleported += ResetSway;                        // a teleport is not a turn
         baseFov = GameSettings.Fov;
         if (cam != null) cam.fieldOfView = baseFov;
-        weapons = weapons == null ? new Weapon[0] : System.Array.FindAll(weapons, x => x != null);   // a missing reference must not break the rest
+        weapons = weapons == null ? new HandWeapon[0] : System.Array.FindAll(weapons, x => x != null);   // a missing reference must not break the rest
         if (weapons.Length == 0) { enabled = false; return; }
         for (int i = 0; i < weapons.Length; i++) { weapons[i].Init(this); weapons[i].gameObject.SetActive(i == CurrentIndex); }
         if (audioSource != null)
@@ -90,7 +92,7 @@ public class WeaponInventory : MonoBehaviour
         Holstered = on;
         var w = Current;
         if (w != null) { w.CancelReload(); w.gameObject.SetActive(!on); }
-        Aim = 0f; triggerArmed = false; prevHeld = true;
+        Aim = 0f; triggerArmed = false; prevHeld = true; prevAlt = true;
         if (cam != null) cam.fieldOfView = baseFov;
         if (fp != null) fp.lookScale = 1f;
     }
@@ -128,6 +130,7 @@ public class WeaponInventory : MonoBehaviour
         }
         if (over) { held = false; aimHeld = false; }
         bool pressed = held && !prevHeld; prevHeld = held;
+        bool altHeld = aimHeld && !w.hasScope, altPressed = altHeld && !prevAlt; prevAlt = altHeld;   // RMB for a weapon without a scope
 
         // switching: the old weapon goes down, the new one comes up
         float halfSwitch = Mathf.Max(0.01f, switchTime * 0.5f);
@@ -152,7 +155,7 @@ public class WeaponInventory : MonoBehaviour
             if (fp != null) fp.lookScale = cam.fieldOfView / baseFov;         // the same mouse move turns the view less when zoomed in
         }
 
-        w.Tick(held, pressed, pending < 0 && raise > 0.7f, cam, Aim);
+        w.Tick(held, pressed, altHeld, altPressed, pending < 0 && raise > 0.7f, cam, Aim);
 
         float speed = fp != null && fp.IsGrounded ? fp.PlanarVelocity.magnitude : 0f;
         bobT += Time.deltaTime * speed * 1.35f;
@@ -198,19 +201,30 @@ public class WeaponInventory : MonoBehaviour
             fp.AddRecoil(w.recoil * (1f - 0.5f * Aim));
             lastPitch = fp.Pitch;                                       // the kick is the weapon's own animation, not a turn to sway after
         }
-        if (voicePool != null && w.shotClips != null && w.shotClips.Length > 0)
-        {
-            var a = voicePool[nextVoice]; nextVoice = (nextVoice + 1) % voicePool.Length;
-            a.Stop(); a.clip = w.shotClips[Random.Range(0, w.shotClips.Length)];
-            a.pitch = w.shotPitch * Random.Range(0.95f, 1.05f); a.volume = w.shotVolume * GameSettings.ShotVolume; a.Play();
-        }
+        if (w.shotClips != null && w.shotClips.Length > 0)
+            PlaySound(w.shotClips[Random.Range(0, w.shotClips.Length)], w.shotVolume, w.shotPitch * Random.Range(0.95f, 1.05f));
+    }
+
+    /// <summary>A weapon sound through the pool of voices (the oldest is cut), at the shot volume of the settings.</summary>
+    public void PlaySound(AudioClip clip, float volume, float pitch)
+    {
+        if (voicePool == null || clip == null) return;
+        var a = voicePool[nextVoice]; nextVoice = (nextVoice + 1) % voicePool.Length;
+        a.Stop(); a.clip = clip; a.pitch = pitch; a.volume = volume * GameSettings.ShotVolume; a.Play();
+    }
+
+    /// <summary>A blade connected with this many bots: the hit marker, a small jolt of the view.</summary>
+    public void OnMeleeHit(HandWeapon w, int bots)
+    {
+        Hits += bots; LastHitTime = Time.time;
+        if (fp != null) { fp.AddRecoil(-0.6f); lastPitch = fp.Pitch; }    // the blade bites: the view dips a little
     }
 
     /// <summary>A picked-up magazine goes to the weapon in hand, or to the first one with room; false if every pouch is full.</summary>
     public bool GiveMagazine()
     {
-        Weapon t = Current != null && !Current.ReserveFull ? Current : null;
-        if (t == null) foreach (var x in weapons) if (!x.ReserveFull) { t = x; break; }
+        Weapon t = CurrentGun != null && !CurrentGun.ReserveFull ? CurrentGun : null;
+        if (t == null) foreach (var x in weapons) { var g = x as Weapon; if (g != null && !g.ReserveFull) { t = g; break; } }
         if (t == null || !t.AddMagazine()) return false;
         PickupText = "+1 MAGAZINE  " + t.displayName; PickupTime = Time.time;
         return true;

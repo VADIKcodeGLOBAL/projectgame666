@@ -47,7 +47,7 @@ public class SimpleFirstPersonController : MonoBehaviour
     CharacterMotor motor;
     float pitch, lastGroundedTime = -10f, jumpPressedTime = -10f, boostEnd, boostMultiplier = 1f;
     Vector3 startPosition;
-    bool testActive, testSprint, testJump; Vector3 testMove;
+    bool testActive, testSprint, testJump; Vector3 testMove; float testTurn;
 
     void Awake()
     {
@@ -58,7 +58,9 @@ public class SimpleFirstPersonController : MonoBehaviour
 
     /// <summary>Drives the controller without a keyboard (automated tests). ClearTestInput gives control back.</summary>
     public void SetTestInput(Vector3 move, bool sprint, bool jump) { testActive = true; testMove = move; testSprint = sprint; testJump |= jump; }
-    public void ClearTestInput() { testActive = false; testJump = false; }
+    public void ClearTestInput() { testActive = false; testJump = false; testTurn = 0f; }
+    /// <summary>Tests: turn the view at a steady rate, degrees per second (right +), every frame of the game loop.</summary>
+    public void SetTestTurn(float yawDegreesPerSecond) { testTurn = yawDegreesPerSecond; }
 
     void Update()
     {
@@ -75,6 +77,7 @@ public class SimpleFirstPersonController : MonoBehaviour
 
         float dt = Time.deltaTime;
         if (dt <= 0f) return;                                            // paused (settings menu)
+        if (testTurn != 0f) transform.Rotate(0f, testTurn * dt, 0f);
         Vector3 input = testActive ? testMove : new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical"));
         bool sprintKey = testActive ? testSprint : (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
         bool jumpKey = testActive ? testJump : Input.GetKeyDown(KeyCode.Space);

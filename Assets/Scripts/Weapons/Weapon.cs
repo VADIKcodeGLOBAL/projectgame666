@@ -4,14 +4,13 @@ using UnityEngine;
 /// One first-person weapon. A round is registered the moment it is fired (a ray from the camera, no projectile and no tracer);
 /// ammo is a magazine plus spare rounds with a timed reload; every round shows the muzzle fire (a quad with the flash texture,
 /// turned to a random angle), a short flash of light and a few sparks; the view model kicks, dips for the reload and drops
-/// for a weapon switch. WeaponInventory owns the input and calls Tick and UpdatePose for the weapon in hand.
+/// for a weapon switch. WeaponInventory owns the input and calls Tick and UpdatePose for the weapon in hand (HandWeapon).
 /// </summary>
-public class Weapon : MonoBehaviour
+public class Weapon : HandWeapon
 {
     public enum FireMode { Auto, Semi }
 
     [Header("Shooting")]
-    public string displayName = "Rifle";
     public FireMode mode = FireMode.Auto;
     public float damage = 40f;
     public float roundsPerSecond = 10f;
@@ -26,10 +25,6 @@ public class Weapon : MonoBehaviour
     public int maxMagazines = 8;
     [Tooltip("Endless spare magazines (the sidearm).")] public bool infiniteReserve;
     public float reloadTime = 2.2f;
-
-    [Header("Scope")]
-    public bool hasScope;
-    public float scopeFov = 12f;
 
     [Header("View model")]
     public Transform muzzle;
@@ -46,26 +41,22 @@ public class Weapon : MonoBehaviour
     public AudioClip[] shotClips;
     public float shotVolume = 0.55f, shotPitch = 1f;
 
-    public WeaponInventory Owner { get; private set; }
     public int InMagazine { get; private set; }
     /// <summary>Spare rounds outside the magazine.</summary>
     public int Reserve { get; private set; }
-    public bool IsReloading { get; private set; }
+    public override bool IsReloading { get { return reloading; } }
     public float ReloadProgress { get { return IsReloading ? Mathf.Clamp01((Time.time - reloadStart) / Mathf.Max(0.01f, reloadTime)) : 0f; } }
     /// <summary>Spare magazines (a part-used one counts as one); -1 when endless.</summary>
     public int Magazines { get { return infiniteReserve ? -1 : (Reserve + magazineSize - 1) / magazineSize; } }
     public bool ReserveFull { get { return infiniteReserve || Reserve >= maxMagazines * magazineSize; } }
     public bool HasSpare { get { return infiniteReserve || Reserve > 0; } }
-    /// <summary>How far the sway has turned the gun from its resting pose, degrees.</summary>
-    public float SwayTiltNow { get; private set; }
 
     static readonly RaycastHit[] hitBuffer = new RaycastHit[16];
     Vector3 restPos; Quaternion restRot; Vector3 magRest; Renderer[] modelRenderers, magRenderers;
     float nextShot, lastShot = -10f, reloadStart, effectOff, kickAmount, lightIntensity;
-    bool modelVisible = true, magVisible = true;
+    bool modelVisible = true, magVisible = true, reloading;
 
-    /// <summary>Called once by the inventory (the weapons not in hand are inactive, so Awake would come too late).</summary>
-    public void Init(WeaponInventory owner)
+    public override void Init(WeaponInventory owner)
     {
         Owner = owner;
         restPos = transform.localPosition; restRot = transform.localRotation;
@@ -77,24 +68,24 @@ public class Weapon : MonoBehaviour
         if (flashLight != null) { lightIntensity = flashLight.intensity; flashLight.enabled = false; }
     }
 
-    public bool StartReload()
+    public override bool StartReload()
     {
-        if (IsReloading || InMagazine >= magazineSize || !HasSpare) return false;
-        IsReloading = true; reloadStart = Time.time;
+        if (reloading || InMagazine >= magazineSize || !HasSpare) return false;
+        reloading = true; reloadStart = Time.time;
         return true;
     }
 
-    public void CancelReload() { IsReloading = false; }
+    public override void CancelReload() { reloading = false; }
 
     void FinishReload()
     {
         int take = magazineSize - InMagazine;
         if (!infiniteReserve) { take = Mathf.Min(take, Reserve); Reserve -= take; }
-        InMagazine += take; IsReloading = false;
+        InMagazine += take; reloading = false;
     }
 
     /// <summary>A full magazine at once, no reload (tests and scripted events).</summary>
-    public void FillMagazine() { InMagazine = magazineSize; IsReloading = false; }
+    public void FillMagazine() { InMagazine = magazineSize; reloading = false; }
 
     /// <summary>A picked-up magazine; false when the pouch is full.</summary>
     public bool AddMagazine()
@@ -104,8 +95,8 @@ public class Weapon : MonoBehaviour
         return true;
     }
 
-    /// <summary>The weapon in hand, every frame. held: trigger down; pressed: went down this frame; aim: 0..1 scope.</summary>
-    public void Tick(bool held, bool pressed, bool ready, Camera cam, float aim)
+    /// <summary>The trigger is LMB; RMB is the scope (handled by the inventory), so altHeld / altPressed are not used.</summary>
+    public override void Tick(bool held, bool pressed, bool altHeld, bool altPressed, bool ready, Camera cam, float aim)
     {
         float now = Time.time;
         if (IsReloading && now >= reloadStart + reloadTime) FinishReload();
@@ -162,9 +153,7 @@ public class Weapon : MonoBehaviour
         if (Owner != null) Owner.OnRoundFired(this, hit);
     }
 
-    /// <summary>View-model motion. raise: 0 lowered out of sight (switching) .. 1 in hand; aim: 0..1 scope; bob: walk sway;
-    /// swayTilt (degrees) and swayShift (metres): the lag behind a turning view, both in camera space.</summary>
-    public void UpdatePose(float raise, float aim, Vector3 bob, Vector3 swayTilt, Vector3 swayShift)
+    public override void UpdatePose(float raise, float aim, Vector3 bob, Vector3 swayTilt, Vector3 swayShift)
     {
         float dt = Time.deltaTime;
         if (Time.time > effectOff)

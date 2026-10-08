@@ -317,7 +317,10 @@ public static class WeaponSetup
 
         var pivot = new GameObject("Weapons").transform; pivot.SetParent(camera.transform, false);
         var log = new StringBuilder("weapons (" + clips.Length + " shot sounds):\n");
-        var list = Specs.Select(sp => BuildWeapon(sp, pivot, fx, clips, log)).ToArray();
+        var guns = Specs.Select(sp => BuildWeapon(sp, pivot, fx, clips, log)).ToArray();
+        var list = new HandWeapon[guns.Length + 1];                     // a HandWeapon[] of its own: a Weapon[] could not hold the sword
+        for (int i = 0; i < guns.Length; i++) list[i] = guns[i];
+        list[guns.Length] = SwordSetup.Build(pivot, fx, log);            // slot 5: the bastard sword
         for (int i = 0; i < list.Length; i++) list[i].gameObject.SetActive(i == 0);
         var inv = player.AddComponent<WeaponInventory>();
         inv.cam = camera; inv.weapons = list; inv.audioSource = audio;
@@ -359,10 +362,12 @@ public static class WeaponSetup
         var active = inv.weapons.Select(w => w.gameObject.activeSelf).ToArray();
         try
         {
-            foreach (var w in inv.weapons)
+            foreach (var hw in inv.weapons)
             {
-                foreach (var o in inv.weapons) o.gameObject.SetActive(o == w);
-                EditorAutomation.Shot("wpn_view_" + w.name, t.position, t.position + t.forward, inv.cam.fieldOfView, false, inv.cam.nearClipPlane);
+                foreach (var o in inv.weapons) o.gameObject.SetActive(o == hw);
+                EditorAutomation.Shot("wpn_view_" + hw.name, t.position, t.position + t.forward, inv.cam.fieldOfView, false, inv.cam.nearClipPlane);
+                var w = hw as Weapon;
+                if (w == null) continue;                                   // the sword: no muzzle
                 w.muzzleFire.enabled = true; w.muzzleFire.transform.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
                 w.flashLight.enabled = true;
                 EditorAutomation.Shot("wpn_fire_" + w.name, t.position, t.position + t.forward, inv.cam.fieldOfView, false, inv.cam.nearClipPlane);

@@ -367,12 +367,10 @@ public static partial class EditorAutomation
             {
                 QualitySettings.vSyncCount = 0; Application.targetFrameRate = rates[r];
                 yield return Wait(0.8f);
-                float rest = inv.SwayAngleNow, peak = 0f, lastT = Time.time;
-                yield return Run(0.5f, () =>                               // turn right at 180 °/s
-                {
-                    float now = Time.time; fp.transform.Rotate(0f, 180f * (now - lastT), 0f); lastT = now;
-                    peak = Mathf.Max(peak, inv.SwayAngleNow);
-                });
+                float rest = inv.SwayAngleNow, peak = 0f;
+                fp.SetTestTurn(180f);                                      // turn right at 180 °/s, frame by frame in the game loop
+                yield return Run(0.5f, () => peak = Mathf.Max(peak, inv.SwayAngleNow));
+                fp.SetTestTurn(0f);
                 yield return Wait(1.2f);
                 float settled = inv.SwayAngleNow;
                 peaks[r] = peak;
