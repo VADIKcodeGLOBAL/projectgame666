@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using static UiBuild;
 
 /// <summary>
 /// The HUD as a uGUI Canvas (Screen Space Overlay, scaled from 1920x1080): only references to its parts, filled by SurvivalHud.
@@ -66,39 +67,7 @@ public class HudView : MonoBehaviour
     public static readonly Color Gold = new Color(1f, 0.85f, 0.4f), Grey = new Color(0.85f, 0.85f, 0.85f), Warn = new Color(1f, 0.3f, 0.2f);
 
     // ------------------------------------------------------------------ building
-    static Font font;
-    static Font UiFont { get { if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); return font; } }
-
-    static RectTransform Node(string name, Transform parent, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size)
-    {
-        var go = new GameObject(name, typeof(RectTransform));
-        var rt = (RectTransform)go.transform;
-        rt.SetParent(parent, false);
-        rt.anchorMin = rt.anchorMax = anchor; rt.pivot = pivot; rt.anchoredPosition = pos; rt.sizeDelta = size;
-        return rt;
-    }
-
-    static RectTransform Stretch(string name, Transform parent)
-    {
-        var rt = Node(name, parent, Vector2.zero, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        return rt;
-    }
-
-    /// <summary>A nested canvas: its children are batched and rebuilt on their own.</summary>
-    static RectTransform Layer(string name, Transform parent)
-    {
-        var rt = Stretch(name, parent);
-        rt.gameObject.AddComponent<Canvas>();
-        return rt;
-    }
-
-    static Image Box(string name, Transform parent, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size, Color c)
-    {
-        var img = Node(name, parent, anchor, pivot, pos, size).gameObject.AddComponent<Image>();
-        img.color = c; img.raycastTarget = false;
-        return img;
-    }
+    // the blocks (Node, Stretch, Layer, Box, Label) are UiBuild's
 
     /// <summary>Bar background with a fill child whose right edge (anchorMax.x) is the value.</summary>
     static RectTransform Bar(string name, Transform parent, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size, Color back, Color fill, float inset, out Image fillImage)
@@ -108,15 +77,6 @@ public class HudView : MonoBehaviour
         f.offsetMin = new Vector2(inset, inset); f.offsetMax = new Vector2(-inset, -inset);
         fillImage = f.gameObject.AddComponent<Image>(); fillImage.color = fill; fillImage.raycastTarget = false;
         return f;
-    }
-
-    static Text Label(string name, Transform parent, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, TextAnchor align, Color c, bool bold = true, string text = "")
-    {
-        var t = Node(name, parent, anchor, pivot, pos, size).gameObject.AddComponent<Text>();
-        t.font = UiFont; t.fontSize = fontSize; t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal; t.alignment = align; t.color = c;
-        t.horizontalOverflow = HorizontalWrapMode.Overflow; t.verticalOverflow = VerticalWrapMode.Overflow; t.raycastTarget = false; t.text = text;
-        var sh = t.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0f, 0f, 0f, 0.7f); sh.effectDistance = new Vector2(2f, -2f);
-        return t;
     }
 
     /// <summary>The whole HUD under parent (a Screen Space Overlay canvas with a 1920x1080 scaler on a new child object).</summary>

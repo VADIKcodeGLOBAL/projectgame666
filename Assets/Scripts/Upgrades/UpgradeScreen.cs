@@ -46,8 +46,6 @@ public class UpgradeScreen : MonoBehaviour
     Text header, titleText, footer, panelTitle, panelHint;
     readonly Card[] cards = new Card[MaxCards];
     readonly List<Row> rows = new List<Row>();
-    static Font font;
-    static Font UiFont { get { if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); return font; } }
 
     // ------------------------------------------------------------------ building
     void Awake() { Build(); }
@@ -112,35 +110,21 @@ public class UpgradeScreen : MonoBehaviour
         return c;
     }
 
-    static RectTransform Node(string name, Transform parent, Vector2 pos, Vector2 size)
-    {
-        var rt = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
-        rt.SetParent(parent, false);
-        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = pos; rt.sizeDelta = size;
-        return rt;
-    }
+    // the cards are laid out from their middles: UiBuild's blocks, centre-anchored
+    static RectTransform Node(string name, Transform parent, Vector2 pos, Vector2 size) { return UiBuild.Node(name, parent, UiBuild.Centre, UiBuild.Centre, pos, size); }
 
-    static RectTransform Stretch(string name, Transform parent)
-    {
-        var rt = Node(name, parent, Vector2.zero, Vector2.zero); rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        return rt;
-    }
+    static RectTransform Stretch(string name, Transform parent) { return UiBuild.Stretch(name, parent); }
 
     static Image Img(string name, Transform parent, Sprite sprite, Vector2 pos, Vector2 size, Color c)
     {
-        var img = Node(name, parent, pos, size).gameObject.AddComponent<Image>();
-        img.sprite = sprite; img.color = c; img.raycastTarget = false;
+        var img = UiBuild.Box(name, parent, UiBuild.Centre, UiBuild.Centre, pos, size, c);
+        img.sprite = sprite;
         return img;
     }
 
     static Text Label(string name, Transform parent, Vector2 pos, Vector2 size, int fontSize, Color c, bool bold)
     {
-        var t = Node(name, parent, pos, size).gameObject.AddComponent<Text>();
-        t.font = UiFont; t.fontSize = fontSize; t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal; t.color = c;
-        t.alignment = TextAnchor.MiddleCenter; t.horizontalOverflow = HorizontalWrapMode.Overflow; t.verticalOverflow = VerticalWrapMode.Overflow;
-        t.raycastTarget = false;
-        var sh = t.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0f, 0f, 0f, 0.6f); sh.effectDistance = new Vector2(1.5f, -1.5f);
-        return t;
+        return UiBuild.Label(name, parent, UiBuild.Centre, UiBuild.Centre, pos, size, fontSize, TextAnchor.MiddleCenter, c, bold);
     }
 
     // ------------------------------------------------------------------ showing

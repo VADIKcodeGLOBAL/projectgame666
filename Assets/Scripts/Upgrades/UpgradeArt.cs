@@ -26,6 +26,17 @@ public static class UpgradeArt
     public static Sprite Ring { get { if (ring == null) ring = Plain("UpRing", 128, (x, y) => Mathf.Clamp01(0.5f - (Mathf.Abs(Vector2.Distance(new Vector2(x, y), new Vector2(64f, 64f)) - 59f) - 3f))); return ring; } }
     public static Sprite Fade { get { if (fade == null) fade = Plain("UpFade", 64, (x, y) => Mathf.Pow(y / 64f, 1.6f)); return fade; } }
 
+    static Texture2D softDot;
+    /// <summary>A soft round glow (white, alpha falling off to the edge), for the additive flashes in the world.</summary>
+    public static Texture2D SoftDot
+    {
+        get
+        {
+            if (softDot == null) softDot = Tex("UpSoftDot", 64, (x, y) => Mathf.Pow(Mathf.Clamp01(1f - Vector2.Distance(new Vector2(x, y), new Vector2(32f, 32f)) / 32f), 1.8f));
+            return softDot;
+        }
+    }
+
     public static Sprite Icon(ModIcon icon)
     {
         Sprite s;

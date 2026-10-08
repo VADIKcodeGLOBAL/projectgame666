@@ -20,6 +20,8 @@ public class UpgradeSystem : MonoBehaviour
     [Tooltip("Added to each weight for every wave after the first (the odds move up the rarities).")]
     public float[] weightPerWave = { -7f, 0f, 3f, 2f, 1f };
     [Tooltip("Puts the choice off / brings a choice put off back.")] public KeyCode laterKey = KeyCode.Tab;
+    [Tooltip("Offers go straight to the panel on the left without pausing the game (scripted runs, tests that measure the game).")]
+    public bool deferOffers;
 
     [Header("This run")]
     [Tooltip("What the modifiers taken so far add up to.")] public RunStats stats;
@@ -43,7 +45,7 @@ public class UpgradeSystem : MonoBehaviour
     WaveSurvivalGame.GameState lastState;
     PlayerHealth health; WeaponInventory inv; SimpleFirstPersonController fp;
     float timeScaleBefore = 1f, untouchableUntil = -1f;
-    bool lastStandUsed;
+    bool lastStandUsed, overShown;
 
     void Awake()
     {
@@ -91,6 +93,7 @@ public class UpgradeSystem : MonoBehaviour
             return;
         }
         bool over = game != null && game.IsOver;
+        if (over != overShown) { overShown = over; RefreshWaiting(); }     // the game is over: the waiting choices are of no use now
         if (waiting.Count > 0 && !over && Input.GetKeyDown(laterKey) && Cursor.lockState == CursorLockMode.Locked && !SettingsMenu.IsOpen) OpenWaiting();
     }
 
@@ -99,7 +102,7 @@ public class UpgradeSystem : MonoBehaviour
     public void OfferAfterWave(int wave)
     {
         var o = Roll(wave); Offered++;
-        if (current != null) { waiting.Add(o); RefreshWaiting(); } else OpenOffer(o);
+        if (current != null || deferOffers) { waiting.Add(o); RefreshWaiting(); } else OpenOffer(o);
     }
 
     /// <summary>The cards of an offer after this wave (no side effects).</summary>
@@ -195,7 +198,7 @@ public class UpgradeSystem : MonoBehaviour
     void RefreshWaiting()
     {
         var mods = new List<Modifier[]>(); var waves = new List<int>();
-        foreach (var o in waiting) { mods.Add(o.cards); waves.Add(o.wave); }
+        if (!overShown) foreach (var o in waiting) { mods.Add(o.cards); waves.Add(o.wave); }
         screen.SetWaiting(mods, waves, laterKey.ToString().ToUpperInvariant());
     }
 
@@ -303,7 +306,6 @@ public class UpgradeSystem : MonoBehaviour
     bool fxLive;
     MaterialPropertyBlock block;
     static readonly int ColorId = Shader.PropertyToID("_Color"), IntensityId = Shader.PropertyToID("_Intensity");
-    static Texture2D softTex;
 
     Material FxMaterial(Color c, float intensity, Texture2D tex)
     {
@@ -312,21 +314,6 @@ public class UpgradeSystem : MonoBehaviour
         var m = new Material(sh) { hideFlags = HideFlags.DontSave };
         m.SetColor(ColorId, c); m.SetFloat(IntensityId, intensity); if (tex != null) m.SetTexture("_MainTex", tex);
         return m;
-    }
-
-    static Texture2D SoftTex()
-    {
-        if (softTex != null) return softTex;
-        const int n = 64; softTex = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.DontSave };
-        var px = new Color32[n * n];
-        for (int y = 0; y < n; y++) for (int x = 0; x < n; x++)
-            {
-                float r = new Vector2(x + 0.5f - n * 0.5f, y + 0.5f - n * 0.5f).magnitude / (n * 0.5f);
-                float a = Mathf.Pow(Mathf.Clamp01(1f - r), 1.8f);
-                px[y * n + x] = new Color32(255, 255, 255, (byte)(a * 255f));
-            }
-        softTex.SetPixels32(px); softTex.Apply(false, true);
-        return softTex;
     }
 
     Fx Take(List<Fx> list, bool line)
@@ -344,7 +331,7 @@ public class UpgradeSystem : MonoBehaviour
         }
         else
         {
-            if (burstMat == null) burstMat = FxMaterial(new Color(1f, 0.6f, 0.25f, 1f), 2.2f, SoftTex());
+            if (burstMat == null) burstMat = FxMaterial(new Color(1f, 0.6f, 0.25f, 1f), 2.2f, UpgradeArt.SoftDot);
             var q = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(q.GetComponent<Collider>());
             q.transform.SetParent(fx.go.transform, false);
             fx.r = q.GetComponent<MeshRenderer>(); fx.r.sharedMaterial = burstMat; fx.r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; fx.r.receiveShadows = false;

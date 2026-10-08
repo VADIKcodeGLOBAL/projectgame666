@@ -61,30 +61,39 @@ public static partial class EditorAutomation
         Check(true, "profiled: " + EnemyBot.All.Count + " bots left, " + game.Kills + " killed");
     }
 
+    static bool profiling;
+
+    /// <summary>Records frames frames of the profiler and analyses just those: what the Profiler window held before is left alone.</summary>
     static IEnumerator Capture(string label, int frames, Action perFrame)
     {
-        ProfilerDriver.ClearAllFrames();
-        ProfilerDriver.enabled = true;
+        int from = ProfilerDriver.lastFrameIndex + 1;
+        profiling = true; ProfilerDriver.enabled = true;
         int start = Time.frameCount; float t0 = Time.realtimeSinceStartup;
         while (Time.frameCount < start + frames) { if (perFrame != null) perFrame(); yield return null; }
         float secs = Time.realtimeSinceStartup - t0;
-        ProfilerDriver.enabled = false;
-        Analyze(label, secs);
+        StopProfiling();
+        Analyze(label, secs, from);
     }
 
-    static void Analyze(string label, float secs)
+    /// <summary>Recording off (also when Play mode ends in the middle of a capture).</summary>
+    static void StopProfiling()
+    {
+        if (!profiling) return;
+        profiling = false; ProfilerDriver.enabled = false;
+    }
+
+    static void Analyze(string label, float secs, int from)
     {
         var self = new Dictionary<string, double>(); var gc = new Dictionary<string, double>(); var calls = new Dictionary<string, double>();
-        int first = ProfilerDriver.firstFrameIndex, last = ProfilerDriver.lastFrameIndex, n = 0;
+        int first = Mathf.Max(from, ProfilerDriver.firstFrameIndex), last = ProfilerDriver.lastFrameIndex, n = 0;
         double frameMs = 0, editor = 0;
-        var kids = new List<int>();
         for (int f = first; f <= last && f >= 0; f++)
         {
             using (var v = ProfilerDriver.GetHierarchyFrameDataView(f, 0, HierarchyFrameDataView.ViewModes.MergeSamplesWithTheSameName, HierarchyFrameDataView.columnSelfTime, false))
             {
                 if (v == null || !v.valid) continue;
                 n++; frameMs += v.frameTimeMs;
-                Walk(v, v.GetRootItemID(), "(root)", self, gc, calls, ref editor);
+                Walk(v, v.GetRootItemID(), "(root)", 0, self, gc, calls, ref editor);
             }
         }
         if (n == 0) { Log("  profile " + label + ": no frames captured"); return; }
@@ -99,12 +108,16 @@ public static partial class EditorAutomation
         Log(sb.ToString().TrimEnd());
     }
 
-    static void Walk(HierarchyFrameDataView v, int id, string parent, Dictionary<string, double> self, Dictionary<string, double> gc, Dictionary<string, double> calls, ref double editor)
+    static readonly List<List<int>> kidLists = new List<List<int>>();          // one list per depth, reused
+
+    static void Walk(HierarchyFrameDataView v, int id, string parent, int depth, Dictionary<string, double> self, Dictionary<string, double> gc, Dictionary<string, double> calls, ref double editor)
     {
-        var kids = new List<int>();
+        while (kidLists.Count <= depth) kidLists.Add(new List<int>());
+        var kids = kidLists[depth];
         v.GetItemChildren(id, kids);
-        foreach (int k in kids)
+        for (int i = 0; i < kids.Count; i++)
         {
+            int k = kids[i];
             string name = v.GetItemName(k);
             if (name == "EditorLoop") { editor += v.GetItemColumnDataAsFloat(k, HierarchyFrameDataView.columnTotalTime); continue; }
             if (name == "GC.Alloc")
@@ -116,7 +129,7 @@ public static partial class EditorAutomation
             double s = v.GetItemColumnDataAsFloat(k, HierarchyFrameDataView.columnSelfTime), cnt = v.GetItemColumnDataAsFloat(k, HierarchyFrameDataView.columnCalls);
             double o; self.TryGetValue(name, out o); self[name] = o + s;
             calls.TryGetValue(name, out o); calls[name] = o + cnt;
-            Walk(v, k, name, self, gc, calls, ref editor);
+            Walk(v, k, name, depth + 1, self, gc, calls, ref editor);
         }
     }
 }

@@ -53,6 +53,21 @@ public static partial class EditorAutomation
         Check(s5[2] + s5[3] + s5[4] > (s1[2] + s1[3] + s1[4]) * 1.5f && s1[0] > s5[0] && s5[4] > 0f && mixed > 200 && repeats == 0,
               "odds % (COMMON/GREAT/RARE/SWEG/SLAYER): after wave 1 " + pct(s1) + ", after wave 5 " + pct(s5) + "; mixed offers " + mixed + "/400, repeats " + repeats);
 
+        // ---- a wave held: the offer comes up by itself and pauses the game
+        game.waveDuration = 1.5f; game.intermission = 30f; game.batchInterval = 1000f; game.enabled = true;
+        float w0 = Time.realtimeSinceStartup;
+        while (!UpgradeSystem.IsChoosing && Time.realtimeSinceStartup < w0 + 15f) yield return null;
+        yield return RealWait(0.9f);
+        var real = ups.Current;
+        Check(real != null && real.wave == 1 && Time.timeScale == 0f && Cursor.lockState != CursorLockMode.Locked && game.State == WaveSurvivalGame.GameState.Intermission,
+              "wave 1 held: the offer comes up by itself (" + (real != null ? string.Join(", ", real.cards.Select(m => m.title + " " + ModifierCatalog.Name(m.rarity)).ToArray()) : "none")
+              + "), paused " + (Time.timeScale == 0f) + ", mouse " + Cursor.lockState);
+        if (real != null) { ups.Later(); yield return RealWait(0.8f); }
+        game.enabled = false; ups.Waiting.Clear();
+        for (int i = EnemyBot.All.Count - 1; i >= 0; i--) EnemyBot.All[i].Die(false);
+        foreach (var p in SupplyPickup.All.ToArray()) Object.Destroy(p.gameObject);   // the wave laid medkits on the summit: they would heal
+        yield return Wait(0.3f);
+
         // ---- an offer: paused, the mouse free, the cards on the screen
         var screen = ups.Screen;
         ups.OpenOffer(new UpgradeSystem.Offer { wave = 2, cards = new[] { ModifierCatalog.Find("c_damage"), ModifierCatalog.Find("g_mags"), ModifierCatalog.Find("r_pierce") } });

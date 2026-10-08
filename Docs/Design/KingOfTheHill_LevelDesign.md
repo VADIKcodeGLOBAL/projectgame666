@@ -79,6 +79,8 @@ WASD, Shift — бег, Space — прыжок, C — закурить (ещё �
 | SLAYER | красный | меняет игру — **пока две заглушки** (BERSERK, DEATHLESS), настоящие придумаем | 1,5 % → 5,5 % |
 
 Веса и их рост по волнам — поля `baseWeights` / `weightPerWave` компонента `UpgradeSystem` (на объекте Game).
+`deferOffers` — выборы сразу уходят на панель без паузы (сценарные прогоны: так их откладывает `playtest`). Припасов на земле — не больше `maxPickups` (40)
+у `WaveSurvivalGame`: со Scavenger падение после каждого убийства, лимит держит их число.
 
 - COMMON: Hollow Points (урон +8 %), Oiled Bolt (темп +7 %), Quick Hands (перезарядка +12 %), Light Boots (скорость +5 %),
   Thick Skin (здоровье +10), Whetstone (меч +10 %), Steady Aim (разброс −15 %), Bandages (аптечки +20 %).

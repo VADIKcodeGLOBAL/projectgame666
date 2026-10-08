@@ -203,15 +203,7 @@ public static class SmokingSetup
     static Texture2D Tex(string name, int w, int h, Func<float, float, Color> pixel)
     {
         string path = TexDir + "/" + name + ".png";
-        if (!File.Exists(path))
-        {
-            var t = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            var px = new Color[w * h];
-            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) px[y * w + x] = pixel((x + 0.5f) / w, (y + 0.5f) / h);
-            t.SetPixels(px); t.Apply();
-            File.WriteAllBytes(path, t.EncodeToPNG()); Object.DestroyImmediate(t);
-            AssetDatabase.ImportAsset(path);
-        }
+        WeaponSetup.WriteTextureOnce(path, w, h, pixel);
         var ti = (TextureImporter)AssetImporter.GetAtPath(path);
         if (!ti.alphaIsTransparency || ti.wrapMode != TextureWrapMode.Clamp)
         {

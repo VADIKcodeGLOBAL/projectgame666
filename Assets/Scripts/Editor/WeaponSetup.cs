@@ -136,18 +136,22 @@ public static class WeaponSetup
         return mat;
     }
 
+    /// <summary>A texture drawn in code, written to path as a PNG and imported - once (an existing file is kept). pixel gives the
+    /// colour (alpha included) at u, v in 0..1, sampled at the pixel centres. The callers set the import settings they need.</summary>
+    public static void WriteTextureOnce(string path, int w, int h, Func<float, float, Color> pixel)
+    {
+        if (File.Exists(path)) return;
+        var t = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        var px = new Color32[w * h];
+        for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) px[y * w + x] = pixel((x + 0.5f) / w, (y + 0.5f) / h);
+        t.SetPixels32(px); t.Apply();
+        File.WriteAllBytes(path, t.EncodeToPNG()); Object.DestroyImmediate(t);
+        AssetDatabase.ImportAsset(path);
+    }
+
     static Texture2D GenTex(string path, int w, int h, Func<float, float, float> alpha)
     {
-        if (!File.Exists(path))
-        {
-            var t = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            var px = new Color32[w * h];
-            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++)
-                px[y * w + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(alpha((x + 0.5f) / w, (y + 0.5f) / h)) * 255f));
-            t.SetPixels32(px); t.Apply();
-            File.WriteAllBytes(path, t.EncodeToPNG()); Object.DestroyImmediate(t);
-            AssetDatabase.ImportAsset(path);
-        }
+        WriteTextureOnce(path, w, h, (u, v) => new Color(1f, 1f, 1f, Mathf.Clamp01(alpha(u, v))));
         return FxTex(path, 256);
     }
 

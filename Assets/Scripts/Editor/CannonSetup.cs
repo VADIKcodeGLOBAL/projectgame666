@@ -62,21 +62,11 @@ public static class CannonSetup
     {
         EnsureFolder(FxTexDir);
         string path = FxTexDir + "/" + name + ".png";
-        if (!File.Exists(path))
+        WeaponSetup.WriteTextureOnce(path, size, size, (u, v) =>
         {
-            var t = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            var px = new Color32[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                {
-                    float u = (x + 0.5f) / size, v = (y + 0.5f) / size;
-                    byte g = (byte)(Mathf.Clamp01(grey != null ? grey(u, v) : 1f) * 255f);
-                    px[y * size + x] = new Color32(g, g, g, (byte)(Mathf.Clamp01(alpha(u, v)) * 255f));
-                }
-            t.SetPixels32(px); t.Apply();
-            File.WriteAllBytes(path, t.EncodeToPNG()); Object.DestroyImmediate(t);
-            AssetDatabase.ImportAsset(path);
-        }
+            float g = Mathf.Clamp01(grey != null ? grey(u, v) : 1f);
+            return new Color(g, g, g, Mathf.Clamp01(alpha(u, v)));
+        });
         var ti = (TextureImporter)AssetImporter.GetAtPath(path);
         if (!ti.alphaIsTransparency || ti.wrapMode != TextureWrapMode.Clamp)
         {
@@ -245,6 +235,7 @@ public static class CannonSetup
         cannon.sightLocal = new Vector3(b.min.x - 0.05f, b.max.y + 0.95f, b.min.z + 0.35f);
         var camGo = new GameObject("GunnerCamera"); camGo.transform.SetParent(root.transform, false); camGo.transform.localPosition = cannon.sightLocal;
         var cam = camGo.AddComponent<Camera>(); cam.nearClipPlane = 0.1f; cam.farClipPlane = 8000f; cam.fieldOfView = 75f; cam.enabled = false;
+        cam.cullingMask &= ~(1 << WeaponSetup.ViewModelLayer());      // the hands, the guns and a cigarette are the view model camera's
         camGo.AddComponent<AudioListener>().enabled = false;
         var blur = camGo.AddComponent<EdgeBlurEffect>(); blur.shader = Shader.Find("Hidden/ProjectGame/EdgeBlur");
         cannon.gunnerCamera = cam;

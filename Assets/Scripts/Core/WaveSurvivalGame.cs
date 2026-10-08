@@ -42,6 +42,7 @@ public class WaveSurvivalGame : MonoBehaviour
     [Tooltip("Chance that a killed bot drops a magazine.")] [Range(0f, 1f)] public float dropChance = 0.3f;
     [Tooltip("Chance that a killed bot drops a medkit.")] [Range(0f, 1f)] public float medkitDropChance = 0.15f;
     [Tooltip("Chance that a killed bot drops a speed syringe.")] [Range(0f, 1f)] public float speedDropChance = 0.05f;
+    [Tooltip("No more drops while this many supplies lie around (the Scavenger upgrade makes every kill drop one).")] [Min(1)] public int maxPickups = 40;
     [Tooltip("Magazines kept lying inside the circle during a wave.")] public int summitMagazines = 2;
     [Tooltip("Seconds between new magazines inside the circle.")] public float summitMagazineInterval = 20f;
     [Tooltip("Medkits kept lying inside the circle during a wave.")] public int summitMedkits = 1;
@@ -159,7 +160,7 @@ public class WaveSurvivalGame : MonoBehaviour
         if (sum > 1f) more /= sum;
         float roll = Random.value, a = dropChance * more, m = a + medkitDropChance * more, s = m + speedDropChance * more;
         SupplyPickup drop = roll < a ? ammoPickupPrefab : roll < m ? medkitPrefab : roll < s ? speedPrefab : null;
-        if (drop != null) SupplyPickup.Spawn(drop, bot.transform.position);
+        if (drop != null && SupplyPickup.All.Count < maxPickups) SupplyPickup.Spawn(drop, bot.transform.position);
         if (UpgradeSystem.Instance != null) UpgradeSystem.Instance.OnKill(bot);
     }
 

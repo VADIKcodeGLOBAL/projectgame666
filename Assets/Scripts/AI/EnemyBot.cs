@@ -48,6 +48,7 @@ public class EnemyBot : MonoBehaviour
     /// <summary>Every bot's frame, from BotDirector's one Update: 200 MonoBehaviour Updates would cost a native call each.</summary>
     public static void TickAll(float dt)
     {
+        if (dt <= 0f) return;                                          // paused: no zero moves, no blow landing on the frozen clock
         using (TickMarker.Auto())
         {
             if (gridFrame != Time.frameCount) BuildGrid();

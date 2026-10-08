@@ -10,7 +10,8 @@ public class ShadowlessCamera : MonoBehaviour
 {
     float saved = -1f;
 
-    void OnPreCull() { saved = QualitySettings.shadowDistance; QualitySettings.shadowDistance = 0f; }
+    // saved only while nothing is saved: a cull that never reached OnPostRender must not make 0 the distance to come back to
+    void OnPreCull() { if (saved < 0f) saved = QualitySettings.shadowDistance; QualitySettings.shadowDistance = 0f; }
 
     void OnPostRender() { if (saved >= 0f) { QualitySettings.shadowDistance = saved; saved = -1f; } }
 

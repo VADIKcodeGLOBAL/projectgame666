@@ -229,13 +229,14 @@ public class MeleeWeapon : HandWeapon
         if (hits > 0)
         {
             BotsHit += hits;
-            if (!hitSounded)                                           // the first bite of this swing: it slows, the view jolts
+            bool first = !hitSounded;                                  // the first bite of this swing: it slows, sounds and jolts the
+            if (first)                                                 // view once (a blade through a crowd cuts on several frames)
             {
                 hitSounded = true;
                 hitStopEnd = Time.time + (chop ? chopHitStop : slashHitStop);
                 if (Owner != null) Owner.PlaySound(impact, chop ? 1f : 0.8f, chop ? Random.Range(0.72f, 0.8f) : Random.Range(0.88f, 0.98f));
             }
-            if (Owner != null) Owner.OnMeleeHit(this, hits, chop ? chopPunch : slashPunch);
+            if (Owner != null) Owner.OnMeleeHit(this, hits, first ? (chop ? chopPunch : slashPunch) : 0f);
         }
     }
 

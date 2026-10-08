@@ -65,7 +65,8 @@ public class Smoking : MonoBehaviour
 
     static AudioClip click, strike, flare, inhale, exhale, flick;
     float burnt, ashLength, glowNow, glowWant, idleRate, flameT;
-    bool finishEarly, handShown;
+    bool finishEarly, handShown, putAway;
+    AudioSource[] voices; int nextVoice;
     Coroutine run;
     MaterialPropertyBlock block;
     static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), IntensityId = Shader.PropertyToID("_Intensity");
@@ -75,19 +76,37 @@ public class Smoking : MonoBehaviour
     {
         block = new MaterialPropertyBlock();
         if (click == null) MakeSounds();
-        ResetCigarette(); ShowHand(false); Show(pack, false); Show(lighter, false); Show(cigarette, false);
-        SetFlame(false); SetEmissions(0f);
+        if (audioSource != null)                                       // a voice per sound: one source re-pitched for the next sound
+        {                                                              // would re-pitch the tail of the one still playing
+            voices = new AudioSource[4]; voices[0] = audioSource;
+            for (int i = 1; i < voices.Length; i++)
+            {
+                var a = gameObject.AddComponent<AudioSource>();
+                a.playOnAwake = false; a.spatialBlend = audioSource.spatialBlend; a.outputAudioMixerGroup = audioSource.outputAudioMixerGroup;
+                voices[i] = a;
+            }
+        }
+        PutAway();
         if (tipSmoke != null) tipSmoke.Play();                         // both run all the time with nothing to emit:
         if (breath != null) breath.Play();                             // the wisp gets a rate, the breath single puffs
     }
 
-    void OnDisable()                                                   // cut short: everything back in the pocket
+    // cut short (the rig switched off, the level unloading): only the state here - the hierarchy may not be changed while it
+    // is being deactivated, so the props go back in the pocket on the next frame it runs
+    void OnDisable()
     {
         if (run != null) { StopCoroutine(run); run = null; }
-        Current = Phase.None;
-        if (hand == null || cigarette == null) return;
-        ShowHand(false); Show(pack, false); Show(lighter, false); SetFlame(false);
-        Show(cigarette, false); ResetCigarette();
+        Current = Phase.None; Lit = false; IsDrawing = IsExhaling = false; FlameOn = false; glowNow = 0f;
+        if (tipSmoke != null) { var em = tipSmoke.emission; em.rateOverTime = 0f; }
+        putAway = true;
+    }
+
+    /// <summary>Nothing in hand: the hand, the pack, the lighter and the cigarette hidden, the flame and the glow off, a new cigarette ready.</summary>
+    void PutAway()
+    {
+        putAway = false;
+        ShowHand(false); Show(pack, false); Show(lighter, false); Show(cigarette, false);
+        SetFlame(false); ResetCigarette(); SetEmissions(0f);
     }
 
     /// <summary>C: light one up when not smoking; while smoking (the drags), throw it away now.</summary>
@@ -99,6 +118,7 @@ public class Smoking : MonoBehaviour
 
     void Update()
     {
+        if (putAway) PutAway();
         var game = WaveSurvivalGame.Instance;
         bool over = game != null && game.IsOver;
         if (Cursor.lockState == CursorLockMode.Locked && !SettingsMenu.IsOpen && !over && Input.GetKeyDown(KeyCode.C)) Toggle();
@@ -407,8 +427,9 @@ public class Smoking : MonoBehaviour
 
     void Play(AudioClip clip, float v, float pitch)
     {
-        if (audioSource == null || clip == null) return;
-        audioSource.pitch = pitch; audioSource.PlayOneShot(clip, v * volume);
+        if (voices == null || clip == null) return;
+        var a = voices[nextVoice]; nextVoice = (nextVoice + 1) % voices.Length;
+        a.Stop(); a.clip = clip; a.pitch = pitch; a.volume = v * volume; a.Play();
     }
 
     // ------------------------------------------------------------------ sounds (made once, no files)
