@@ -352,7 +352,7 @@ public static class WeaponSetup
         return t;
     }
 
-    static Transform ArmBox(Transform parent, string name, Material mat)
+    public static Transform ArmBox(Transform parent, string name, Material mat)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube); go.name = name;
         Object.DestroyImmediate(go.GetComponent<Collider>());
@@ -423,6 +423,7 @@ public static class WeaponSetup
         for (int i = 0; i < guns.Length; i++) list[i] = guns[i];
         list[guns.Length] = SwordSetup.Build(pivot, fx, armMat, log);    // slot 5: the bastard sword
         foreach (var t in pivot.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;
+        SmokingSetup.Build(viewCam.transform, layer, armMat, log);       // C: a cigarette, whatever the hands hold
         for (int i = 0; i < list.Length; i++) list[i].gameObject.SetActive(i == 0);
         var inv = player.AddComponent<WeaponInventory>();
         inv.cam = camera; inv.viewCam = viewCam; inv.weapons = list; inv.audioSource = audio;

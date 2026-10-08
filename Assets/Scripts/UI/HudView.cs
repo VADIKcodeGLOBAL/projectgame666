@@ -194,7 +194,7 @@ public class HudView : MonoBehaviour
         v.reload.SetActive(false);
         v.status = Label("Status", a, TL, TL, new Vector2(12f, -88f), new Vector2(260f, 18f), 14, TextAnchor.MiddleLeft, new Color(1f, 0.4f, 0.3f), true, "");
         v.help = Label("Controls", bl, BL, BL, new Vector2(24f, 2f), new Vector2(1600f, 20f), 15, TextAnchor.MiddleLeft, Color.white, false,
-            "LMB - capture mouse / fire / slash    R - reload    RMB - scope / heavy chop    1-5 / wheel - weapon    WASD - move    Shift - sprint    Space - jump    Esc - menu / settings");
+            "LMB - capture mouse / fire / slash    R - reload    RMB - scope / heavy chop    1-5 / wheel - weapon    WASD - move    Shift - sprint    Space - jump    C - smoke    Esc - menu / settings");
 
         // ---- bottom right: weapon slots (filled by SurvivalHud) and kills
         var br = Layer("BottomRight", root);

@@ -67,6 +67,7 @@ public static partial class EditorAutomation
         if (mode == "movetest") { MoveTick(); return; }
         if (mode == "cannontest") { SuiteTick(CannonTests, "CANNONTEST"); return; }
         if (mode == "swordtest") { SuiteTick(SwordTests, "SWORDTEST"); return; }
+        if (mode == "smoketest") { SuiteTick(SmokeTests, "SMOKETEST"); return; }
         float t = Time.timeSinceLevelLoad;
         if (t < 1.5f) return;
         var game = WaveSurvivalGame.Instance;
@@ -473,6 +474,7 @@ public static partial class EditorAutomation
             else if (cmd == "movetest") { moveTestRunner = null; ArmPlaytest("movetest"); }
             else if (cmd == "cannontest") { moveTestRunner = null; ArmPlaytest("cannontest"); }
             else if (cmd == "swordtest") { moveTestRunner = null; ArmPlaytest("swordtest"); }
+            else if (cmd == "smoketest") { moveTestRunner = null; ArmPlaytest("smoketest"); }
             else if (cmd == "cannon") CannonSetup.InstallInOpenScene();
             else if (cmd == "cannon-view") CannonSetup.ViewShots();
             else if (cmd == "zone") KothMapGenerator.RebuildZoneInOpenScene();
