@@ -71,7 +71,8 @@ public class FieldCannon : MonoBehaviour
     public float FlightTime { get; private set; }
     public float Range { get; private set; }
     public float PushSpeedNow { get { return pushVel; } }
-    public bool PushBlocked { get; private set; }
+    /// <summary>Pushed against something it cannot pass (kept a moment, so it does not flicker while the cannon creeps up to it).</summary>
+    public bool PushBlocked { get { return Time.time < blockedUntil; } }
     public int Shots { get; private set; }
 
     static readonly List<FieldCannon> all = new List<FieldCannon>();
@@ -86,6 +87,7 @@ public class FieldCannon : MonoBehaviour
     Quaternion[] wheelRest;
     float yaw, camYaw, camPitch, reloadEnd, pushVel, recoil, kick, fireShown = -1f, baseFov = 70f;
     bool triggerArmed, testAim, testFireQueued; Vector3 testAimPoint; float testPush, testTurn; bool testPushActive;
+    float blockedUntil = -1f;
     SimpleFirstPersonController user; Camera userCamera; AudioListener userListener, gunnerListener; WeaponInventory userWeapons;
 
     void OnEnable() { all.Add(this); }
@@ -429,10 +431,14 @@ public class FieldCannon : MonoBehaviour
         Vector3 fwd = Quaternion.Euler(0f, yaw + dYaw, 0f) * Vector3.forward;
         Vector3 target = transform.position + fwd * pushVel * dt;
         float before = yaw;
-        PushBlocked = !Place(target, yaw + dYaw, true);
-        if (PushBlocked && Mathf.Abs(dYaw) > 0f) PushBlocked = !Place(transform.position, yaw + dYaw, true);   // can it at least turn?
-        if (PushBlocked) pushVel = 0f;
-        else TurnWheels(pushVel * dt, Mathf.DeltaAngle(before, yaw));
+        bool refused = !Place(target, yaw + dYaw, true);
+        if (refused && Mathf.Abs(dYaw) > 0f) refused = !Place(transform.position, yaw + dYaw, true);   // can it at least turn?
+        if (refused) { pushVel = 0f; blockedUntil = Time.time + 0.2f; }
+        else
+        {
+            TurnWheels(pushVel * dt, Mathf.DeltaAngle(before, yaw));
+            if (push <= 0f || pushVel > 0.5f) blockedUntil = -1f;      // backed off or rolling freely again; a creep at the obstacle keeps it
+        }
 
         // the player walks behind the trail
         Vector3 feet = transform.position - Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * handleDistance, g;

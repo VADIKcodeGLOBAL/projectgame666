@@ -19,6 +19,10 @@ public abstract class HandWeapon : MonoBehaviour
     /// <summary>How far the sway has turned the weapon from its resting pose, degrees.</summary>
     public float SwayTiltNow { get; protected set; }
     public virtual bool IsReloading { get { return false; } }
+    /// <summary>Part of the normal walking / running speed the player has with this weapon in hand right now (a heavy one is slower).</summary>
+    public virtual float MoveSpeedScale { get { return 1f; } }
+    /// <summary>Putting this weapon away and drawing it takes this many times WeaponInventory.switchTime.</summary>
+    public virtual float DrawTimeScale { get { return 1f; } }
 
     /// <summary>Called once by the inventory (the weapons not in hand are inactive, so Awake would come too late).</summary>
     public abstract void Init(WeaponInventory owner);

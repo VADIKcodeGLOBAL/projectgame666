@@ -8,7 +8,8 @@ using Object = UnityEngine.Object;
 public static partial class EditorAutomation
 {
     /// <summary>
-    /// "swordtest": the bastard sword in Play mode with the waves off. It is slot 5 and shows its blows on the HUD; a slash cuts the bots
+    /// "swordtest": the bastard sword in Play mode with the waves off. It is slot 5 and shows its blows on the HUD; it is big (1.6 m) and
+    /// heavy: slow to draw, the player walks slower with it and slower still during a chop, a missed chop jolts the view; a slash cuts the bots
     /// in its arc and reach (in front, 45 degrees left) and spares the one behind and the far one, lands during the strike (not on the
     /// click), throws them back and staggers them; held LMB chains slashes both ways; the RMB chop hits harder in a narrow arc and does
     /// not zoom; a wall between saves the bot; a weak bot dies; the guns still work after it.
@@ -32,11 +33,34 @@ public static partial class EditorAutomation
         fp.Teleport(c + Vector3.up * 0.3f); fp.transform.rotation = Quaternion.identity; fp.Pitch = 0f; inv.ResetSway();
         inv.Select(4);
         float t0 = Time.time;
-        while (inv.IsSwitching && Time.time < t0 + 2f) yield return null;
+        while (inv.IsSwitching && Time.time < t0 + 3f) yield return null;
+        float drawn = Time.time - t0, wantDrawn = inv.switchTime * 0.5f * (1f + sword.drawTime);   // the gun goes down, the sword comes up slowly
         yield return Wait(0.2f);
         var hud = Object.FindFirstObjectByType<HudView>();
         Check(inv.Current == sword && hud != null && hud.status.text.Contains("SLASH") && !hud.rounds.gameObject.activeSelf,
               "sword in hand, HUD shows its blows (" + (hud != null ? hud.status.text : "no HUD") + ")");
+        var mesh = sword.GetComponentInChildren<MeshFilter>();
+        Vector3 meshSize = mesh != null ? Vector3.Scale(mesh.sharedMesh.bounds.size, mesh.transform.lossyScale) : Vector3.zero;
+        float length = Mathf.Max(Mathf.Abs(meshSize.x), Mathf.Abs(meshSize.y), Mathf.Abs(meshSize.z));
+        Check(length > 1.5f && Mathf.Abs(drawn - wantDrawn) < 0.12f, "a big sword: " + F3(length) + " m, drawn in " + F3(drawn) + " s (expected ~" + F3(wantDrawn) + ")");
+
+        // ---- the weight: slower on foot with it, slower still while the chop is swung, full speed again after
+        fp.SetTestInput(Vector3.forward, false, false);
+        yield return Wait(0.6f);
+        float carryV = fp.PlanarVelocity.magnitude;
+        inv.SetTestInput(false, true); yield return null; inv.SetTestInput(false, false);
+        yield return Wait(sword.chopWindup + sword.chopStrike * 0.5f);
+        float swingV = fp.PlanarVelocity.magnitude, punchMax = 0f;
+        fp.SetTestInput(Vector3.back, false, false);                   // the way back, so the walk stays on the summit
+        yield return Run(sword.chopRecover + 0.6f, () => punchMax = Mathf.Max(punchMax, fp.ViewPunch));
+        float afterV = fp.PlanarVelocity.magnitude;
+        fp.ClearTestInput();
+        Check(Mathf.Abs(carryV - fp.walkSpeed * sword.carrySpeed) < 0.15f && Mathf.Abs(swingV - fp.walkSpeed * sword.chopMoveSpeed) < 0.3f
+              && Mathf.Abs(afterV - fp.walkSpeed * sword.carrySpeed) < 0.15f && punchMax > 0.2f && Mathf.Abs(fp.ViewPunch) < 0.05f,
+              "weight: walks " + F3(carryV) + " m/s with it (walk " + fp.walkSpeed + "), " + F3(swingV) + " during the chop, " + F3(afterV) + " after; a missed chop jolts the view "
+              + F3(punchMax) + " deg, back to " + F3(fp.ViewPunch));
+        fp.Teleport(c + Vector3.up * 0.3f); fp.transform.rotation = Quaternion.identity; fp.Pitch = 0f; inv.ResetSway();
+        yield return Wait(0.3f);
 
         var bots = new List<EnemyBot>();
         Func<Vector3, float, EnemyBot> spawn = (offset, hp) =>
@@ -102,6 +126,8 @@ public static partial class EditorAutomation
         clear();
 
         // ---- pictures (a screenshot stalls a frame, so none of them is taken during a timed check)
+        while (sword.State != MeleeWeapon.Swing.None) yield return null;
+        yield return Wait(0.2f);
         ScreenCapture.CaptureScreenshot(ShotDir + "/sword_rest.png");
         yield return Wait(0.3f);
         inv.SetTestInput(true, false); yield return null; inv.SetTestInput(false, false);
@@ -117,10 +143,13 @@ public static partial class EditorAutomation
 
         // ---- the guns after it
         inv.Select(0); t0 = Time.time;
-        while (inv.IsSwitching && Time.time < t0 + 2f) yield return null;
+        while (inv.IsSwitching && Time.time < t0 + 3f) yield return null;
         int shots = inv.ShotsFired; fp.Pitch = -70f;
+        fp.SetTestInput(Vector3.forward, false, false);
         inv.SetTestInput(true, false); yield return Wait(0.5f); inv.SetTestInput(false, false); inv.ClearTestInput();
-        fp.Pitch = 0f;
-        Check(inv.CurrentGun != null && inv.ShotsFired > shots + 2 && hud.rounds.gameObject.activeSelf, "back to the " + (inv.Current != null ? inv.Current.displayName : "-") + ": " + (inv.ShotsFired - shots) + " rounds, ammo on the HUD again");
+        float gunV = fp.PlanarVelocity.magnitude;
+        fp.ClearTestInput(); fp.Pitch = 0f;
+        Check(inv.CurrentGun != null && inv.ShotsFired > shots + 2 && hud.rounds.gameObject.activeSelf && Mathf.Abs(gunV - fp.walkSpeed) < 0.15f,
+              "back to the " + (inv.Current != null ? inv.Current.displayName : "-") + ": " + (inv.ShotsFired - shots) + " rounds, ammo on the HUD again, walks " + F3(gunV) + " m/s");
     }
 }

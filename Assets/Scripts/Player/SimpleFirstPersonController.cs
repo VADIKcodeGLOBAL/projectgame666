@@ -27,10 +27,16 @@ public class SimpleFirstPersonController : MonoBehaviour
     public float VerticalVelocity { get { return Motor.VerticalVelocity; } }
     public bool IsGrounded { get { return Motor.IsGrounded; } }
     public bool IsSprinting { get; private set; }
-    /// <summary>Camera pitch, degrees (negative = up).</summary>
-    public float Pitch { get { return pitch; } set { pitch = Mathf.Clamp(value, -85f, 85f); if (cameraPivot != null) cameraPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f); } }
+    /// <summary>Camera pitch, degrees (negative = up); the view punch comes on top of it.</summary>
+    public float Pitch { get { return pitch; } set { pitch = Mathf.Clamp(value, -85f, 85f); if (cameraPivot != null) cameraPivot.localRotation = Quaternion.Euler(pitch + punch, 0f, 0f); } }
     /// <summary>Weapon recoil: lifts the view.</summary>
     public void AddRecoil(float degreesUp) { Pitch = pitch - degreesUp; }
+    /// <summary>A jolt of the view that springs back by itself (a heavy blow landing), degrees down (+) or up (-). Pitch keeps the aim.</summary>
+    public void Punch(float degreesDown) { punchTarget += degreesDown; }
+    /// <summary>The view punch right now, degrees down.</summary>
+    public float ViewPunch { get { return punch; } }
+    /// <summary>Part of the normal speed the weapon in hand allows (a heavy sword is slower); set by WeaponInventory every frame.</summary>
+    public float CarrySpeedScale { get; set; } = 1f;
 
     /// <summary>Speed supply: multiplier and seconds left (0 when none).</summary>
     public float SpeedMultiplier { get { return Time.time < boostEnd ? boostMultiplier : 1f; } }
@@ -45,7 +51,7 @@ public class SimpleFirstPersonController : MonoBehaviour
     public void ClearSpeedBoost() { boostEnd = 0f; }
 
     CharacterMotor motor;
-    float pitch, lastGroundedTime = -10f, jumpPressedTime = -10f, boostEnd, boostMultiplier = 1f;
+    float pitch, punch, punchTarget, lastGroundedTime = -10f, jumpPressedTime = -10f, boostEnd, boostMultiplier = 1f;
     Vector3 startPosition;
     bool testActive, testSprint, testJump; Vector3 testMove; float testTurn;
 
@@ -78,6 +84,13 @@ public class SimpleFirstPersonController : MonoBehaviour
         float dt = Time.deltaTime;
         if (dt <= 0f) return;                                            // paused (settings menu)
         if (testTurn != 0f) transform.Rotate(0f, testTurn * dt, 0f);
+        if (punch != 0f || punchTarget != 0f)                            // the punch comes quickly and eases back
+        {
+            punch = Mathf.Lerp(punch, punchTarget, 1f - Mathf.Exp(-35f * dt));
+            punchTarget = Mathf.Lerp(punchTarget, 0f, 1f - Mathf.Exp(-9f * dt));
+            if (Mathf.Abs(punch) < 0.002f && Mathf.Abs(punchTarget) < 0.002f) punch = punchTarget = 0f;
+            Pitch = pitch;
+        }
         Vector3 input = testActive ? testMove : new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical"));
         bool sprintKey = testActive ? testSprint : (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
         bool jumpKey = testActive ? testJump : Input.GetKeyDown(KeyCode.Space);
@@ -88,7 +101,7 @@ public class SimpleFirstPersonController : MonoBehaviour
 
         IsSprinting = sprintKey && input.sqrMagnitude > 0.01f;          // Shift held = sprint, whatever happened before
         Vector3 heading = transform.TransformDirection(input); heading.y = 0f;
-        float speed = (IsSprinting ? sprintSpeed : walkSpeed) * SpeedMultiplier;
+        float speed = (IsSprinting ? sprintSpeed : walkSpeed) * SpeedMultiplier * Mathf.Clamp(CarrySpeedScale, 0.1f, 1f);
 
         var m = Motor;
         if (m.IsGrounded) lastGroundedTime = Time.time;

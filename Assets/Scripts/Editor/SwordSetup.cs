@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// The bastard sword in the player's hands: the artist's model (Sword.rar in Assets/Art/Weapons/Models/source/source) made ready
-/// by Source/Blender/Scripts/sword_import.py (1.23 m, origin at the leading hand), material M_Sword (ProjectGame/WeaponPBR with the
+/// by Source/Blender/Scripts/sword_import.py (1.6 m, big and heavy; origin at the leading hand), material M_Sword (ProjectGame/WeaponPBR with the
 /// Sword_* textures; the normal map is baked for DirectX), turned so that the blade runs along +Y and its flat faces +Z
 /// (MeleeWeapon poses it that way), a trail at the tip. Called by WeaponSetup.BuildPlayerWeapons (command "weapons", the map generator).
 /// </summary>
@@ -61,8 +61,8 @@ public static class SwordSetup
         var tip = new GameObject("Tip").transform; tip.SetParent(root.transform, false); tip.localPosition = new Vector3(0f, b.max.y - 0.03f, 0f);
         var trail = tip.gameObject.AddComponent<TrailRenderer>();
         trail.sharedMaterial = WeaponSetup.FxMat("M_SwordTrail", null, new Color(1f, 0.96f, 0.88f, 0.28f), 0.9f);
-        trail.time = 0.09f; trail.minVertexDistance = 0.02f; trail.emitting = false;
-        trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.09f), new Keyframe(1f, 0f));
+        trail.time = 0.12f; trail.minVertexDistance = 0.02f; trail.emitting = false;
+        trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.13f), new Keyframe(1f, 0f));
         trail.shadowCastingMode = ShadowCastingMode.Off; trail.receiveShadows = false;
 
         var sword = root.AddComponent<MeleeWeapon>();

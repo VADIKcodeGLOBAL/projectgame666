@@ -280,6 +280,7 @@ public static partial class EditorAutomation
             case 21:                                                       // movement: sprint down the hill side, then up it
             {
                 fp.ClearSpeedBoost();
+                for (int i = EnemyBot.All.Count - 1; i >= 0; i--) EnemyBot.All[i].Die(false);   // a bot in the path would block a run at random
                 Teleport(fp, c + runDir * 16f); fp.transform.rotation = Quaternion.LookRotation(runDir);
                 fp.SetTestInput(Vector3.forward, true, false);
                 moveTicks = 0; groundTicks = 0; speedSum = 0f; jumpedOk = false; startPos = fp.transform.position;

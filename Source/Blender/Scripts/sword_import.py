@@ -3,7 +3,7 @@ Bastard sword model for Unity (Blender 5.2 LTS, background). The source (Assets/
 Sword_Low_Done.FBX, textures Sword_* in Assets/Art/Weapons/Models/source/textures) comes in inches, rotated, with the blade
 along -Z and the origin somewhere on the blade. This puts it the way SwordSetup and MeleeWeapon take a sword:
 
-  - one mesh "Sword", transforms applied, 1.23 m overall (the source's proportions kept);
+  - one mesh "Sword", transforms applied, 1.6 m overall: a big, heavy sword (the source's proportions kept);
   - the blade along +Z (Blender) = +Y in Unity, the cross guard across X, the flat of the blade facing +/-Y = +/-Z in Unity;
   - the origin where the leading hand holds the grip: HAND below the guard, on the axis of the grip;
   - material "Sword" (Unity remaps it to M_Sword).
@@ -16,7 +16,7 @@ import bpy, sys, mathutils
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 SRC, OUT = argv[0], argv[1]
-LENGTH = 1.23                       # overall length, m (pommel to point)
+LENGTH = 1.6                        # overall length, m (pommel to point)
 HAND = 0.07                         # the leading hand holds the grip this far below the guard, m
 
 bpy.ops.wm.read_factory_settings(use_empty=True)

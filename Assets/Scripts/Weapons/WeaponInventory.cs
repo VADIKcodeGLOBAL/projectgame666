@@ -108,7 +108,7 @@ public class WeaponInventory : MonoBehaviour
     void LateUpdate()
     {
         Vector2 turned = ViewTurned();                                     // measured every frame, so a cannon spell leaves no jump behind
-        var w = Current; if (w == null || Holstered) { turnRate = Vector2.zero; return; }
+        var w = Current; if (w == null || Holstered) { turnRate = Vector2.zero; if (fp != null) fp.CarrySpeedScale = 1f; return; }
         var game = WaveSurvivalGame.Instance;
         bool over = game != null && game.IsOver;
         bool held, aimHeld;
@@ -132,8 +132,8 @@ public class WeaponInventory : MonoBehaviour
         bool pressed = held && !prevHeld; prevHeld = held;
         bool altHeld = aimHeld && !w.hasScope, altPressed = altHeld && !prevAlt; prevAlt = altHeld;   // RMB for a weapon without a scope
 
-        // switching: the old weapon goes down, the new one comes up
-        float halfSwitch = Mathf.Max(0.01f, switchTime * 0.5f);
+        // switching: the old weapon goes down, the new one comes up (a heavy one takes longer either way)
+        float halfSwitch = Mathf.Max(0.01f, switchTime * 0.5f * w.DrawTimeScale);
         if (pending >= 0)
         {
             raise = Mathf.MoveTowards(raise, 0f, Time.deltaTime / halfSwitch);
@@ -156,6 +156,7 @@ public class WeaponInventory : MonoBehaviour
         }
 
         w.Tick(held, pressed, altHeld, altPressed, pending < 0 && raise > 0.7f, cam, Aim);
+        if (fp != null) fp.CarrySpeedScale = w.MoveSpeedScale;
 
         float speed = fp != null && fp.IsGrounded ? fp.PlanarVelocity.magnitude : 0f;
         bobT += Time.deltaTime * speed * 1.35f;
@@ -213,12 +214,15 @@ public class WeaponInventory : MonoBehaviour
         a.Stop(); a.clip = clip; a.pitch = pitch; a.volume = volume * GameSettings.ShotVolume; a.Play();
     }
 
-    /// <summary>A blade connected with this many bots: the hit marker, a small jolt of the view.</summary>
-    public void OnMeleeHit(HandWeapon w, int bots)
+    /// <summary>A blade connected with this many bots: the hit marker, the view jolted down (punch, degrees; it springs back).</summary>
+    public void OnMeleeHit(HandWeapon w, int bots, float punch)
     {
         Hits += bots; LastHitTime = Time.time;
-        if (fp != null) { fp.AddRecoil(-0.6f); lastPitch = fp.Pitch; }    // the blade bites: the view dips a little
+        PunchView(punch);
     }
+
+    /// <summary>A jolt of the view that springs back (the weight of a blow), degrees down (+) or up (-); the aim is kept.</summary>
+    public void PunchView(float degreesDown) { if (fp != null) fp.Punch(degreesDown); }
 
     /// <summary>A picked-up magazine goes to the weapon in hand, or to the first one with room; false if every pouch is full.</summary>
     public bool GiveMagazine()
