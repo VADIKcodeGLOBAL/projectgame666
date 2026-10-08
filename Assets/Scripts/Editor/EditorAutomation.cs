@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// Small remote control for the open editor: write one command into Logs/EditorAutomation.trigger
-/// (refresh | koth | shots | playtest | perftest | weapons | weapons-view | weapons-info | gameplay | supplies-view | model &lt;Assets folder&gt;)
+/// (refresh | koth | shots | playtest | perftest | weapons | weapons-view | weapons-side | weapons-info | gameplay | supplies-view | model &lt;Assets folder&gt;)
 /// and the editor runs it. Progress goes to Logs/EditorAutomation.log. A command written during Play mode is dropped (only "stop" works there),
 /// so nothing runs by surprise later. Off switch: Tools > Automation > Accept Trigger File Commands.
 /// Also holds the shared Log and Shot helpers of the editor tools.
@@ -88,6 +88,12 @@ public static partial class EditorAutomation
             case 1:
                 if (t < tA + 0.8f) break;
                 vRun = fp.PlanarVelocity.magnitude;
+                {
+                    var inv = fp.GetComponent<WeaponInventory>();
+                    float want = GameSettings.Fov + inv.sprintFovKick * GameSettings.FovEffects;
+                    Log("  playtest sprint fov: " + F(inv.cam.fieldOfView) + " (base " + F(GameSettings.Fov) + ", want " + F(want) + ", effects " + F(GameSettings.FovEffects) + ")");
+                    if (Mathf.Abs(inv.cam.fieldOfView - want) > 0.5f) { Log("PLAYTEST_FAILED: the view does not widen while sprinting"); playPhase = 9; playT = t; break; }
+                }
                 fp.SetTestInput(Vector3.forward, true, true);                       // jump with Shift still held
                 playPhase = 2; tB = t; wasAir = false; landT = -1f; vAir = 0f; break;
             case 2:
@@ -166,6 +172,15 @@ public static partial class EditorAutomation
                 float fired = inv.ShotsFired - tl0, secs = t - playT, fps = (Time.frameCount - landT) / secs, want = ak.roundsPerSecond * secs;
                 Log("  playtest " + ak.displayName + " rate: " + fired + " rounds in " + F(secs) + " s at " + F(fps) + " fps (want " + F(want) + "), magazine " + tl1 + " -> " + ak.InMagazine);
                 if (Mathf.Abs(fired - want) > 1.5f || tl1 - ak.InMagazine != fired) { Log("PLAYTEST_FAILED: rate of fire or ammo count is off"); playPhase = 9; playT = t; break; }
+                Log("  playtest recoil after " + fired + " rounds: strength " + F(ak.RecoilStrength) + ", kick " + F(ak.LastKick.y) + " deg up and " + F(ak.LastKick.x) + " aside (first round " + F(ak.recoil) + ", full x" + F(ak.recoilGrowth) + ")");
+                if (ak.RecoilStrength < 0.99f || ak.LastKick.y < ak.recoil * (1f + (ak.recoilGrowth - 1f) * 0.6f)) { Log("PLAYTEST_FAILED: the recoil does not grow through a burst"); playPhase = 9; playT = t; break; }
+                // view model: own layer and camera, the player camera does not draw it, the hands stay on the grips of a kicking gun
+                int vm = LayerMask.NameToLayer(WeaponSetup.ViewModelLayerName); var arms = ak.GetComponent<ViewModelArms>();
+                float gap = arms != null ? arms.GripGap() : -1f;
+                Log("  playtest view model: layer " + vm + ", camera " + (inv.viewCam != null ? "fov " + F(inv.viewCam.fieldOfView) + " near " + F(inv.viewCam.nearClipPlane) : "MISSING")
+                    + ", player camera draws it " + (vm >= 0 && (inv.cam.cullingMask & (1 << vm)) != 0) + ", hands off the grips " + F(gap * 1000f) + " mm while firing");
+                if (vm < 0 || inv.viewCam == null || (inv.cam.cullingMask & (1 << vm)) != 0 || (inv.viewCam.cullingMask & (1 << vm)) == 0 || ak.gameObject.layer != vm
+                    || arms == null || gap < 0f || gap > 0.001f) { Log("PLAYTEST_FAILED: the weapon is not a view model with the hands on it"); playPhase = 9; playT = t; break; }
                 tl1 = ak.Reserve; playPhase = 13; playT = t; break;        // keep holding: the magazine runs dry and reloads by itself
             }
             case 13:
@@ -178,9 +193,11 @@ public static partial class EditorAutomation
             case 14:
             {
                 var inv = fp.GetComponent<WeaponInventory>(); var ak = inv.CurrentGun;
+                if (ak.IsReloading && ak.ReloadProgress > 0.45f && landT >= 0f) { fp.Pitch = 0f; ScreenCapture.CaptureScreenshot(ShotDir + "/play_reload.png"); landT = -1f; }   // the gun turned over, the hands on it
                 if (ak.IsReloading) { if (t > hp0 + ak.reloadTime + 1f) { Log("PLAYTEST_FAILED: the reload never ends"); playPhase = 9; playT = t; } break; }
                 Log("  playtest reload: " + F(t - hp0) + " s (set " + F(ak.reloadTime) + "), magazine " + ak.InMagazine + "/" + ak.magazineSize + ", spare rounds " + tl1 + " -> " + ak.Reserve + " (magazines " + ak.Magazines + ")");
                 if (ak.InMagazine != ak.magazineSize || tl1 - ak.Reserve != ak.magazineSize) { Log("PLAYTEST_FAILED: the reload did not move one magazine"); playPhase = 9; playT = t; break; }
+                if (ak.RecoilStrength > 0f) { Log("PLAYTEST_FAILED: the recoil did not settle during the reload (strength " + F(ak.RecoilStrength) + ")"); playPhase = 9; playT = t; break; }
                 tl1 = ak.Magazines;
                 SupplyPickup.Spawn(game.ammoPickupPrefab, fp.transform.position + fp.transform.forward * 0.5f);
                 playPhase = 15; playT = t; break;
@@ -344,7 +361,7 @@ public static partial class EditorAutomation
                 var menu = UnityEngine.Object.FindFirstObjectByType<SettingsMenu>();
                 bool paused = Time.timeScale == 0f && SettingsMenu.IsOpen && Cursor.lockState != CursorLockMode.Locked;
                 menu.Close();
-                Log("  playtest settings menu: paused " + paused + ", resumed " + (Time.timeScale == 1f && !SettingsMenu.IsOpen) + ", fov " + F(GameSettings.Fov) + ", volumes " + F(GameSettings.MasterVolume) + "/" + F(GameSettings.MusicVolume) + "/" + F(GameSettings.ShotVolume) + ", music tracks " + menu.music.TrackCount);
+                Log("  playtest settings menu: paused " + paused + ", resumed " + (Time.timeScale == 1f && !SettingsMenu.IsOpen) + ", fov " + F(GameSettings.Fov) + ", fov effects " + F(GameSettings.FovEffects) + ", mouse " + F(GameSettings.MouseSensitivity) + ", volumes " + F(GameSettings.MasterVolume) + "/" + F(GameSettings.MusicVolume) + "/" + F(GameSettings.ShotVolume) + ", music tracks " + menu.music.TrackCount);
                 Log(paused && Time.timeScale == 1f ? "PLAYTEST_OK" : "PLAYTEST_FAILED: the settings menu does not pause and resume");
                 playPhase = 9; playT = t; break;
             }
@@ -448,6 +465,7 @@ public static partial class EditorAutomation
             else if (cmd == "weapons-info") WeaponSetup.Info();
             else if (cmd == "weapons") WeaponSetup.InstallInOpenScene();
             else if (cmd == "weapons-view") WeaponSetup.ViewShots();
+            else if (cmd == "weapons-side") WeaponSetup.SideShots();
             else if (cmd == "gameplay") SupplySetup.InstallInOpenScene();
             else if (cmd == "supplies-view") SupplySetup.ViewShots();
             else if (cmd == "hud") HudSetup.InstallInOpenScene();
@@ -457,6 +475,7 @@ public static partial class EditorAutomation
             else if (cmd == "swordtest") { moveTestRunner = null; ArmPlaytest("swordtest"); }
             else if (cmd == "cannon") CannonSetup.InstallInOpenScene();
             else if (cmd == "cannon-view") CannonSetup.ViewShots();
+            else if (cmd == "zone") KothMapGenerator.RebuildZoneInOpenScene();
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }

@@ -14,6 +14,7 @@ public static class SwordSetup
     const string ModelPath = "Assets/Art/Weapons/Sword/Models/Sword.fbx";
     const string TexDir = WeaponSetup.ModelDir + "/source/textures";
     const string MatDir = "Assets/Art/Weapons/Materials";
+    const float GripSpan = 0.11f;                                       // from the leading hand to the other one along the grip, m
 
     static Material SwordMat()
     {
@@ -31,7 +32,7 @@ public static class SwordSetup
         return m;
     }
 
-    public static MeleeWeapon Build(Transform pivot, WeaponSetup.Fx fx, StringBuilder log)
+    public static MeleeWeapon Build(Transform pivot, WeaponSetup.Fx fx, Material armMat, StringBuilder log)
     {
         var mi = AssetImporter.GetAtPath(ModelPath) as ModelImporter;
         if (mi == null) throw new System.Exception("sword model not found: " + ModelPath + " (run sword_import.py)");
@@ -72,6 +73,8 @@ public static class SwordSetup
                    + ", flat " + "XYZ"[thin] + "\n");
         root.transform.SetParent(pivot, false);
         sword.PutAtRest();
+        // both hands on the long grip: the leading one under the guard (the origin), the other a hand lower
+        WeaponSetup.BuildArms(sword, Vector3.zero, new Vector3(0f, -GripSpan, 0f), false, armMat);
         return sword;
     }
 }

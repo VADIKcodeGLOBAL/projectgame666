@@ -37,8 +37,9 @@ public static partial class EditorAutomation
 
         // ---- aiming takes the view and puts the weapons away
         cannon.EnterAim(fp); yield return null;
-        Check(cannon.Current == FieldCannon.Mode.Aiming && cannon.gunnerCamera.enabled && !playerCam.enabled && !fp.enabled && inv.Holstered,
-              "aiming: gunner camera on, player camera off, walking off, weapons away");
+        Check(cannon.Current == FieldCannon.Mode.Aiming && cannon.gunnerCamera.enabled && !playerCam.enabled && !fp.enabled && inv.Holstered
+              && (inv.viewCam == null || !inv.viewCam.enabled),
+              "aiming: gunner camera on, player and view model cameras off, walking off, weapons away");
 
         Vector3 fwd = cannon.transform.forward; fwd.y = 0f; fwd.Normalize();
         Vector3 target = onGround(cannon.transform.position + Quaternion.Euler(0f, 25f, 0f) * fwd * 190f);   // the valley floor: a clear arc
@@ -113,8 +114,9 @@ public static partial class EditorAutomation
 
         // ---- leaving gives everything back
         cannon.Release(); yield return null;
-        Check(cannon.Current == FieldCannon.Mode.Idle && fp.enabled && !inv.Holstered && playerCam.enabled && !cannon.gunnerCamera.enabled && FieldCannon.Active == null,
-              "left the cannon: walking, weapons and player camera back");
+        Check(cannon.Current == FieldCannon.Mode.Idle && fp.enabled && !inv.Holstered && playerCam.enabled && !cannon.gunnerCamera.enabled && FieldCannon.Active == null
+              && (inv.viewCam == null || inv.viewCam.enabled),
+              "left the cannon: walking, weapons, player and view model cameras back");
 
         // ---- pushing
         cannon.Place(home, homeYaw, false);

@@ -26,7 +26,6 @@ public class SurvivalHud : MonoBehaviour
     SimpleFirstPersonController fp;
     Texture2D scopeTex;
     float scopeHalf = -1f;
-    int hitState = -1;
 
     void Awake()
     {
@@ -138,14 +137,16 @@ public class SurvivalHud : MonoBehaviour
                               : SupplyPickup.LastKind == SupplyPickup.Kind.Speed ? new Color(0.4f, 1f, 0.85f) : HudView.Gold;
         }
         var cannon = FieldCannon.Active;
-        Show(view.crosshair, !over && !scoped && cannon == null);
+        bool cross = !over && !scoped && cannon == null;
+        Show(view.crosshair, cross);
         UpdateCannon(cannon, over);
-        int hit = weapons != null && Time.time - weapons.LastHitTime < 0.12f ? 1 : 0;
-        if (hit != hitState)
+        if (cross && view.crosshairGraphic != null)                      // null: a HUD canvas baked before the crosshair graphic existed
         {
-            hitState = hit;
-            Color cc = hit == 1 ? HudView.Warn : new Color(1f, 1f, 1f, 0.85f);
-            foreach (var b in view.crosshairBars) if (b != null) b.color = cc;
+            var hw = weapons != null ? weapons.Current : null; var w = hw as Weapon;
+            float spread = w != null ? Mathf.Lerp(w.spread, w.scopedSpread, weapons.Aim) : 0f;      // the cone Weapon.Fire uses; a blade has none
+            float fov = weapons != null && weapons.cam != null ? weapons.cam.fieldOfView : GameSettings.Fov;
+            bool ready = hw != null && hw.CanAttack && !weapons.IsSwitching;
+            view.crosshairGraphic.Tick(spread, fov, ready, weapons != null ? weapons.ShotsFired : 0, weapons != null ? weapons.Hits : 0, game.Kills);
         }
 
         // ---- bottom left: health, speed boost, ammo

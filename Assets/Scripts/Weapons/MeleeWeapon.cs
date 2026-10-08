@@ -11,7 +11,8 @@ using UnityEngine;
 /// it takes longer to draw, it lags further behind a turning view and bobs more.
 /// A blow is registered while the blade sweeps (no physics on the model): a bot counts once per swing when the swept part of the arc
 /// passes its direction, its body box is within reach and nothing solid stands between it and the eye. Hit bots are thrown back and
-/// staggered (EnemyBot.Knockback). The view model is posed in camera space along the swing; the swish and the hit are synthesised.
+/// staggered (EnemyBot.Knockback). The view model is posed in camera space along the swing, both placeholder hands on the grip
+/// (ViewModelArms); the swish and the hit are synthesised.
 /// </summary>
 public class MeleeWeapon : HandWeapon
 {
@@ -55,6 +56,7 @@ public class MeleeWeapon : HandWeapon
     public float StrikeProgress { get; private set; }
     public override float MoveSpeedScale { get { return moveScale; } }
     public override float DrawTimeScale { get { return drawTime; } }
+    public override bool CanAttack { get { return State == Swing.None; } }
 
     static AudioClip swish, impact;
     static readonly List<EnemyBot> hitThisSwing = new List<EnemyBot>(16);
@@ -64,6 +66,7 @@ public class MeleeWeapon : HandWeapon
     float t, hitStopEnd = -1f, moveScale = 1f;
     bool nextFromRight = true, hitSounded;
     Vector3 fromPos, heavyTilt, heavyShift; Quaternion fromRot;
+    ViewModelArms arms;
 
     // ------------------------------------------------------------------ poses (camera space: x right, y up, z forward)
     static readonly Vector3 RestHand = new Vector3(0.25f, -0.33f, 0.46f);
@@ -97,7 +100,8 @@ public class MeleeWeapon : HandWeapon
     {
         float a = Mathf.LerpUnclamped(-35f, 125f, s) * Mathf.Deg2Rad;   // from up-and-back, over the top, to down-and-forward
         var blade = new Vector3(0.04f, Mathf.Cos(a), Mathf.Sin(a));
-        pos = new Vector3(Mathf.LerpUnclamped(0.14f, 0.06f, s), Mathf.LerpUnclamped(0.06f, -0.34f, s), Mathf.LerpUnclamped(0.20f, 0.50f, s));
+        // raised: the hands well in front of the face (with the arms on them, closer would fill the view)
+        pos = new Vector3(Mathf.LerpUnclamped(0.12f, 0.06f, s), Mathf.LerpUnclamped(0.10f, -0.34f, s), Mathf.LerpUnclamped(0.34f, 0.50f, s));
         rot = Orient(blade, Vector3.right);
     }
 
@@ -124,6 +128,7 @@ public class MeleeWeapon : HandWeapon
     {
         Owner = owner;
         hasScope = false;                                              // RMB is the chop
+        arms = GetComponent<ViewModelArms>();
         if (trail != null) { trail.emitting = false; trail.Clear(); }
         if (swish == null) swish = MakeSwish();
         if (impact == null) impact = MakeImpact();
@@ -295,6 +300,7 @@ public class MeleeWeapon : HandWeapon
         Quaternion swayRot = Quaternion.Euler(heavyTilt);
         SwayTiltNow = Quaternion.Angle(Quaternion.identity, swayRot);
         transform.localRotation = swayRot * Quaternion.Euler(55f * low, 0f, 0f) * rot;
+        if (arms != null) arms.Solve();                                 // the hands stay on the grip through every swing
     }
 
     // ------------------------------------------------------------------ sounds (made once, no files)

@@ -19,6 +19,8 @@ public abstract class HandWeapon : MonoBehaviour
     /// <summary>How far the sway has turned the weapon from its resting pose, degrees.</summary>
     public float SwayTiltNow { get; protected set; }
     public virtual bool IsReloading { get { return false; } }
+    /// <summary>A click now would attack at once (a gun loaded and not reloading, a blade not in a swing); the crosshair dims otherwise.</summary>
+    public virtual bool CanAttack { get { return true; } }
     /// <summary>Part of the normal walking / running speed the player has with this weapon in hand right now (a heavy one is slower).</summary>
     public virtual float MoveSpeedScale { get { return 1f; } }
     /// <summary>Putting this weapon away and drawing it takes this many times WeaponInventory.switchTime.</summary>

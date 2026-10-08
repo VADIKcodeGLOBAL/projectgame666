@@ -25,6 +25,9 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _Boost: 0
+    - _Danger: 0
+    - _Height: 2.4
     - _Intensity: 1
     - _Speed: 0.6
     - _Stripes: 14

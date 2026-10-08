@@ -85,9 +85,14 @@ public class CannonballSystem : MonoBehaviour
         return Instance;
     }
 
-    void Awake()
+    void Awake() { Instance = this; Build(); }
+
+    /// <summary>The pools. Also after scripts were reloaded in Play mode: the pools (plain C# objects) come back empty then,
+    /// while the objects they held are still under this one.</summary>
+    void Build()
     {
-        Instance = this;
+        for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject);
+        ActiveBalls = 0; lastBall = -1;
         if (ballMesh == null) { var tmp = GameObject.CreatePrimitive(PrimitiveType.Sphere); ballMesh = tmp.GetComponent<MeshFilter>().sharedMesh; Destroy(tmp); }
         for (int i = 0; i < Balls; i++)
         {
@@ -198,6 +203,7 @@ public class CannonballSystem : MonoBehaviour
     /// <summary>Fires a ball; ignore = the cannon (its colliders are never hit). False if every ball is in the air.</summary>
     public bool Launch(Vector3 position, Vector3 velocity, Transform ignore)
     {
+        if (balls[0] == null) Build();                                 // scripts were reloaded in Play mode
         for (int i = 0; i < Balls; i++)
         {
             var b = balls[i];
@@ -235,6 +241,7 @@ public class CannonballSystem : MonoBehaviour
 
     void Update()
     {
+        if (balls[0] == null) Build();                                 // scripts were reloaded in Play mode
         using (UpdateMarker.Auto()) Tick(Time.deltaTime);
     }
 

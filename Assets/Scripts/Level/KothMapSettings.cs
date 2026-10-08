@@ -29,7 +29,8 @@ public class KothMapSettings : ScriptableObject
     public float pathHalfWidth = 1.8f;
 
     [Header("Zone and waves")]
-    [Tooltip("Radius of the zone on the summit the player has to stay in.")] public float captureRadius = 12f;
+    [Tooltip("Radius of the zone on the summit the player has to stay in. Rebuild zone (in the generator window) applies it to the level without regenerating the map.")]
+    public float captureRadius = 16f;
     [Range(1, 12)] public int waves = 5;
     [Tooltip("Length of a wave, seconds.")] public float waveDuration = 90f;
     [Tooltip("A batch of bots arrives every this many seconds.")] public float batchInterval = 30f;

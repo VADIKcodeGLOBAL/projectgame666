@@ -36,6 +36,7 @@ public class KothMapWindow : EditorWindow
             settings.seed = UnityEngine.Random.Range(1, 99999); EditorUtility.SetDirty(settings);
             KothMapGenerator.Generate(settings);
         }
+        if (GUILayout.Button("Rebuild zone only (radius, look)")) KothMapGenerator.RebuildZoneInOpenScene();
         if (!string.IsNullOrEmpty(KothMapGenerator.LastReport)) EditorGUILayout.HelpBox(KothMapGenerator.LastReport, MessageType.Info);
     }
 }
@@ -1008,29 +1009,52 @@ public static class KothMapGenerator
         return root;
     }
 
-    /// <summary>Strip around the zone following the ground: flat ring (wallHeight = 0) or a vertical wall with UV.y going up.</summary>
-    static Mesh ZoneStrip(string name, float rIn, float rOut, float wallHeight, float top)
+    const float ZoneWallHeight = 2.4f, ZoneRingOverhang = 0.6f;
+
+    /// <summary>
+    /// Mesh around the zone centre (local space, centre at height top) following the ground: rows[j] is the radius of row j,
+    /// lift[j] its height above the ground. UV.x runs around in metres at radius R, rounded to a whole multiple of 4 so the
+    /// shaders' 1, 2 and 4 m patterns close the circle; UV.y is uvY[j].
+    /// </summary>
+    static Mesh ZoneMesh(string name, float R, float top, float[] rows, float[] lift, float[] uvY, bool radialNormals)
     {
-        const int n = 96; var v = new Vector3[(n + 1) * 2]; var uv = new Vector2[(n + 1) * 2]; var t = new int[n * 6];
-        for (int i = 0; i <= n; i++)
+        int n = Mathf.CeilToInt(2f * Mathf.PI * R / 0.7f), m = rows.Length;
+        float around = 4f * Mathf.Max(1f, Mathf.Round(2f * Mathf.PI * R / 4f));
+        var v = new Vector3[(n + 1) * m]; var nm = new Vector3[v.Length]; var uv = new Vector2[v.Length]; var t = new int[n * (m - 1) * 6];
+        for (int i = 0, k = 0; i <= n; i++)
         {
             float a = i * Mathf.PI * 2f / n; Vector3 d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-            if (wallHeight > 0f)
+            for (int j = 0; j < m; j++)
             {
-                float y = GroundY(d.x * rOut, d.z * rOut) - top;
-                v[i * 2] = d * rOut + Vector3.up * (y - 0.3f); v[i * 2 + 1] = d * rOut + Vector3.up * (y + wallHeight);
+                int q = i * m + j; Vector3 p = d * rows[j];
+                v[q] = p + Vector3.up * (GroundY(p.x, p.z) - top + lift[j]);
+                nm[q] = radialNormals ? d : Vector3.up; uv[q] = new Vector2(i / (float)n * around, uvY[j]);
+                if (i < n && j < m - 1) { int b = q, c = q + m; t[k++] = b; t[k++] = b + 1; t[k++] = c; t[k++] = c; t[k++] = b + 1; t[k++] = c + 1; }
             }
-            else
-            {
-                v[i * 2] = d * rIn + Vector3.up * (GroundY(d.x * rIn, d.z * rIn) - top + 0.08f);
-                v[i * 2 + 1] = d * rOut + Vector3.up * (GroundY(d.x * rOut, d.z * rOut) - top + 0.08f);
-            }
-            uv[i * 2] = new Vector2(i / (float)n * 8f, 0f); uv[i * 2 + 1] = new Vector2(i / (float)n * 8f, 1f);
-            if (i < n) { int k = i * 6, b = i * 2; t[k] = b; t[k + 1] = b + 2; t[k + 2] = b + 1; t[k + 3] = b + 1; t[k + 4] = b + 2; t[k + 5] = b + 3; }
         }
-        var m = GetAsset(GenDir + "/" + name + ".asset", () => new Mesh());
-        m.Clear(); m.name = name; m.vertices = v; m.uv = uv; m.triangles = t; m.RecalculateNormals(); m.RecalculateBounds(); EditorUtility.SetDirty(m);
-        return m;
+        var mesh = GetAsset(GenDir + "/" + name + ".asset", () => new Mesh());
+        mesh.Clear(); mesh.name = name; mesh.indexFormat = v.Length > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
+        mesh.vertices = v; mesh.normals = nm; mesh.uv = uv; mesh.triangles = t; mesh.RecalculateBounds(); EditorUtility.SetDirty(mesh);
+        return mesh;
+    }
+
+    /// <summary>Glowing disc on the ground, a little past the boundary (UV.y = metres from the centre).</summary>
+    static Mesh ZoneRingMesh(float R, float top)
+    {
+        float outer = R + ZoneRingOverhang; int rings = Mathf.CeilToInt(outer / 0.8f);
+        var rows = new List<float>();
+        for (int j = 0; j <= rings; j++) rows.Add(outer * j / rings);
+        foreach (float extra in new[] { R - 0.5f, R - 0.12f, R, R + 0.12f })   // dense near the boundary: it hugs the ground under the line
+            if (extra > 0f && !rows.Any(r => Mathf.Abs(r - extra) < 0.05f)) rows.Add(extra);
+        rows.Sort();
+        var r0 = rows.ToArray();
+        return ZoneMesh("KotH_Ring", R, top, r0, r0.Select(_ => 0.07f).ToArray(), r0, false);
+    }
+
+    /// <summary>Wall standing on the boundary, from just under the ground up (UV.y = metres above the ground).</summary>
+    static Mesh ZoneWallMesh(float R, float top)
+    {
+        return ZoneMesh("Zone_Wall", R, top, new[] { R, R }, new[] { -0.3f, ZoneWallHeight }, new[] { -0.3f, ZoneWallHeight }, true);
     }
 
     static EnemyBot MakeBotPrefab()
@@ -1052,17 +1076,19 @@ public static class KothMapGenerator
         return prefab.GetComponent<EnemyBot>();
     }
 
-    static void BuildGameplay(Transform parent)
+    /// <summary>The zone on the summit: flag, glowing floor ring and energy wall. Builds a new one, or rebuilds the visuals of an existing one.</summary>
+    static HillZone BuildZone(Transform parent, HillZone zone = null)
     {
-        float top = GroundY(0f, 0f);
+        float top = GroundY(0f, 0f), R = s.captureRadius;
         var poleMat = ColorMat("M_Pole", new Color(0.35f, 0.33f, 0.30f), "Standard");
         var flagMat = ColorMat("M_KotH_Flag", Color.white, "Standard");
-        var ringMat = ColorMat("M_KotH_Ring", Color.white, "Unlit/Color");
-        var wallMat = ColorMat("M_Zone_Wall", new Color(0.25f, 0.95f, 1f), "ProjectGame/ZoneWall");
+        if (zone == null) { zone = new GameObject("Hill_Zone").AddComponent<HillZone>(); zone.transform.SetParent(parent, false); }
+        for (int i = zone.transform.childCount - 1; i >= 0; i--) UnityEngine.Object.DestroyImmediate(zone.transform.GetChild(i).gameObject);
+        var zoneGo = zone.gameObject; zoneGo.transform.position = new Vector3(0f, top, 0f);
+        zone.radius = R;
+        var ringMat = ColorMat("M_KotH_Ring", zone.safeColor, "ProjectGame/ZoneRing"); ringMat.SetFloat("_Radius", R);
+        var wallMat = ColorMat("M_Zone_Wall", zone.safeColor, "ProjectGame/ZoneWall"); wallMat.SetFloat("_Height", ZoneWallHeight);
 
-        // ---- the zone on the summit
-        var zoneGo = new GameObject("Hill_Zone"); zoneGo.transform.SetParent(parent, false); zoneGo.transform.position = new Vector3(0f, top, 0f);
-        var zone = zoneGo.AddComponent<HillZone>(); zone.radius = s.captureRadius;
         Renderer flagR; Banner(zoneGo.transform, new Vector3(0f, top, 0f), 7f, flagMat, poleMat, out flagR);
         Func<string, Mesh, Material, Renderer> part = (name, mesh, mat) =>
         {
@@ -1070,9 +1096,32 @@ public static class KothMapGenerator
             g.AddComponent<MeshFilter>().sharedMesh = mesh; var r = g.AddComponent<MeshRenderer>(); r.sharedMaterial = mat;
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false; return r;
         };
-        var ringR = part("Ring", ZoneStrip("KotH_Ring", s.captureRadius - 0.16f, s.captureRadius, 0f, top), ringMat);
-        var wallR = part("Wall", ZoneStrip("Zone_Wall", 0f, s.captureRadius, 1.3f, top), wallMat);
+        var ringR = part("Ring", ZoneRingMesh(R, top), ringMat);
+        var wallR = part("Wall", ZoneWallMesh(R, top), wallMat);
         zone.tintRenderers = new[] { ringR, wallR, flagR };
+        EditorUtility.SetDirty(zone);
+        return zone;
+    }
+
+    /// <summary>"zone": rebuilds the zone of the open hill level (radius from the settings, shape from the terrain) and saves the scene.</summary>
+    public static void RebuildZoneInOpenScene()
+    {
+        var scene = EditorSceneManager.GetActiveScene();
+        if (scene.path != ScenePath) scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        var zone = UnityEngine.Object.FindFirstObjectByType<HillZone>();
+        terrain = Terrain.activeTerrain;
+        if (zone == null || terrain == null) { EditorAutomation.Log("ZONE_FAILED: no zone or terrain in " + scene.path); return; }
+        s = LoadOrCreateSettings();
+        BuildZone(zone.transform.parent, zone);
+        EditorSceneManager.MarkSceneDirty(scene);
+        bool saved = EditorSceneManager.SaveScene(scene); AssetDatabase.SaveAssets();
+        EditorAutomation.Log("  zone radius " + F1(zone.radius) + " m, scene saved " + saved);
+        EditorAutomation.Log("ZONE_OK");
+    }
+
+    static void BuildGameplay(Transform parent)
+    {
+        var zone = BuildZone(parent);
 
         // ---- player on the hill: walker + health + rifle + camera effect
         var r0 = routes[0];

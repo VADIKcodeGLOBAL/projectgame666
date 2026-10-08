@@ -39,7 +39,8 @@ public static partial class EditorAutomation
         var hud = Object.FindFirstObjectByType<HudView>();
         Check(inv.Current == sword && hud != null && hud.status.text.Contains("SLASH") && !hud.rounds.gameObject.activeSelf,
               "sword in hand, HUD shows its blows (" + (hud != null ? hud.status.text : "no HUD") + ")");
-        var mesh = sword.GetComponentInChildren<MeshFilter>();
+        var model = sword.transform.Find("Model");                       // the blade itself, not the arm boxes beside it
+        var mesh = model != null ? model.GetComponentInChildren<MeshFilter>() : null;
         Vector3 meshSize = mesh != null ? Vector3.Scale(mesh.sharedMesh.bounds.size, mesh.transform.lossyScale) : Vector3.zero;
         float length = Mathf.Max(Mathf.Abs(meshSize.x), Mathf.Abs(meshSize.y), Mathf.Abs(meshSize.z));
         Check(length > 1.5f && Mathf.Abs(drawn - wantDrawn) < 0.12f, "a big sword: " + F3(length) + " m, drawn in " + F3(drawn) + " s (expected ~" + F3(wantDrawn) + ")");
@@ -78,14 +79,22 @@ public static partial class EditorAutomation
         Vector3 frontAt = front.transform.position;
         int swings = sword.SwingsStarted;
         inv.SetTestInput(true, false); float click = Time.time; yield return null; inv.SetTestInput(false, false);
-        float firstHit = -1f;
-        yield return Run(0.7f, () => { if (firstHit < 0f && front.Health < 1000f) firstHit = Time.time - click; });
+        float firstHit = -1f, gripGap = 0f;
+        var arms = sword.GetComponent<ViewModelArms>();
+        yield return Run(0.7f, () =>
+        {
+            if (firstHit < 0f && front.Health < 1000f) firstHit = Time.time - click;
+            gripGap = Mathf.Max(gripGap, arms != null ? arms.GripGap() : 1f);
+        });
         float pushed = Horiz(front.transform.position, frontAt);
         Check(front.Health == 1000f - sword.slashDamage && left.Health == 1000f - sword.slashDamage && behind.Health == 1000f && far.Health == 1000f,
               "slash: front " + (1000f - front.Health) + ", 45 deg left " + (1000f - left.Health) + ", behind " + (1000f - behind.Health) + ", 4.5 m away " + (1000f - far.Health) + " damage");
         Check(firstHit >= sword.slashWindup - 0.02f && firstHit <= sword.slashWindup + sword.slashStrike + 0.05f,
               "the cut lands during the strike: " + F3(firstHit) + " s after the click (strike " + F3(sword.slashWindup) + "-" + F3(sword.slashWindup + sword.slashStrike) + " s)");
         Check(pushed > 0.3f && sword.SwingsStarted == swings + 1, "thrown back " + F3(pushed) + " m, one swing");
+        int vm = LayerMask.NameToLayer(WeaponSetup.ViewModelLayerName);
+        Check(arms != null && gripGap < 0.001f && sword.gameObject.layer == vm && vm >= 0,
+              "view model: on layer " + sword.gameObject.layer + " (ViewModel " + vm + "), both hands on the grip through the swing (off by " + F3(gripGap * 1000f) + " mm at most)");
         clear(); yield return Wait(0.3f);
 
         // ---- held LMB: a chain of slashes, both ways

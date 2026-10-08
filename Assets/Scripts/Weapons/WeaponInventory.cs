@@ -2,12 +2,16 @@ using UnityEngine;
 
 /// <summary>
 /// The player's weapons (guns and the sword, HandWeapon). With the mouse captured: LMB fire / slash, R reload,
-/// RMB scope (weapons that have one) or the weapon's own second attack (the sword's chop), 1-5 or the mouse wheel to switch. Plays the shot sounds through a small pool of voices, gives picked-up magazines
-/// to a weapon and keeps the numbers the HUD shows.
+/// RMB scope (weapons that have one) or the weapon's own second attack (the sword's chop), 1-5 or the mouse wheel to switch.
+/// Plays the shot sounds through a small pool of voices, gives picked-up magazines to a weapon and keeps the numbers the HUD shows.
+/// The weapons (with their arms) are a view model: the player camera does not draw them, viewCam draws them over the world
+/// with a field of view of its own. The view widens a little at a sprint.
 /// </summary>
 public class WeaponInventory : MonoBehaviour
 {
     public Camera cam;
+    [Tooltip("Draws the weapons and the arms (layer ViewModel) over the world: they never sink into a wall, and the FOV setting, the sprint and the scope do not stretch them.")] public Camera viewCam;
+    [Tooltip("Field of view of the view model camera, degrees (vertical).")] public float viewModelFov = 80f;
     public HandWeapon[] weapons;
     public AudioSource audioSource;
     [Tooltip("Shot sounds playing at once; the oldest one is cut when a new round needs a voice.")] public int voices = 8;
@@ -21,6 +25,10 @@ public class WeaponInventory : MonoBehaviour
     [Tooltip("Most the gun slides away from its place, metres.")] [Min(0f)] public float swayMaxShift = 0.02f;
     [Tooltip("Side lean of the gun into a turn, part of the tilt.")] [Range(0f, 2f)] public float swayRoll = 0.6f;
     [Tooltip("How fast the gun follows the view and comes back to rest, 1/s; lower is softer and lazier.")] [Min(0.5f)] public float swaySmoothing = 9f;
+
+    [Header("Sprint FOV")]
+    [Tooltip("The view widens this much at full sprint speed, degrees; the player's FOV effects setting multiplies it (0 = off).")] public float sprintFovKick = 7f;
+    [Tooltip("How fast the widening follows the sprint, 1/s; lower is softer.")] public float sprintFovSmoothing = 6f;
 
     public static WeaponInventory Instance { get; private set; }
     /// <summary>The player's components, cached for the supplies.</summary>
@@ -41,8 +49,9 @@ public class WeaponInventory : MonoBehaviour
     public float PickupTime { get; private set; } = -10f;
 
     SimpleFirstPersonController fp;
-    float baseFov = 70f, raise = 1f, bobT, lastYaw, lastPitch;
+    float baseFov = 70f, raise = 1f, bobT, lastYaw, lastPitch, sprintFov;    // sprintFov: 0..1 how far the sprint widening is in
     Vector2 turnRate;                                                      // smoothed turning of the view, °/s: x yaw (right +), y pitch (down +)
+    Vector2 lastRecoil;                                                    // the controller's RecoilTurned at the last frame
     int pending = -1;
     bool triggerArmed, prevHeld, prevAlt, testActive, testTrigger, testAim;
     AudioSource[] voicePool; int nextVoice;
@@ -92,9 +101,10 @@ public class WeaponInventory : MonoBehaviour
         Holstered = on;
         var w = Current;
         if (w != null) { w.CancelReload(); w.gameObject.SetActive(!on); }
-        Aim = 0f; triggerArmed = false; prevHeld = true; prevAlt = true;
+        if (viewCam != null) viewCam.enabled = !on;                         // the cannon's camera has the screen alone
+        Aim = 0f; triggerArmed = false; prevHeld = true; prevAlt = true; sprintFov = 0f;
         if (cam != null) cam.fieldOfView = baseFov;
-        if (fp != null) fp.lookScale = 1f;
+        if (fp != null) { fp.lookScale = 1f; fp.ClearRecoil(); }            // no kick or settling left over for the cannon
     }
 
     public void Select(int index)
@@ -149,11 +159,17 @@ public class WeaponInventory : MonoBehaviour
         baseFov = GameSettings.Fov;                                        // from the settings menu
         bool aiming = aimHeld && w.hasScope && !w.IsReloading && pending < 0 && raise > 0.99f;
         Aim = Mathf.MoveTowards(Aim, aiming ? 1f : 0f, Time.deltaTime / Mathf.Max(0.01f, scopeTime));
+        // sprint: the view widens a little with the speed above walking (at the speeds of now: a heavy sword or a speed supply
+        // moves both); pressing into a wall widens nothing
+        float run = fp != null && fp.IsSprinting ? Mathf.InverseLerp(fp.walkSpeed * fp.SpeedScale, fp.sprintSpeed * fp.SpeedScale, fp.PlanarVelocity.magnitude) : 0f;
+        sprintFov = Mathf.Lerp(sprintFov, run, 1f - Mathf.Exp(-sprintFovSmoothing * Time.deltaTime));
         if (cam != null)
         {
-            cam.fieldOfView = w.hasScope ? Mathf.Lerp(baseFov, w.scopeFov, Aim * Aim) : baseFov;      // FOV slider shows at once, also in the pause menu
-            if (fp != null) fp.lookScale = cam.fieldOfView / baseFov;         // the same mouse move turns the view less when zoomed in
+            float fov = w.hasScope ? Mathf.Lerp(baseFov, w.scopeFov, Aim * Aim) : baseFov;
+            if (fp != null) fp.lookScale = fov / baseFov;                     // the same mouse move turns the view less when zoomed in; the sprint widening leaves it alone
+            cam.fieldOfView = fov + sprintFov * (1f - Aim) * sprintFovKick * GameSettings.FovEffects;  // FOV sliders show at once, also in the pause menu; the scope takes the widening away
         }
+        if (viewCam != null) viewCam.fieldOfView = viewModelFov;
 
         w.Tick(held, pressed, altHeld, altPressed, pending < 0 && raise > 0.7f, cam, Aim);
         if (fp != null) fp.CarrySpeedScale = w.MoveSpeedScale;
@@ -174,12 +190,14 @@ public class WeaponInventory : MonoBehaviour
                      new Vector3(tilt.y, tilt.x, tilt.x * swayRoll), new Vector3(slide.x, slide.y, 0f));
     }
 
-    /// <summary>How far the view turned since the last frame, degrees: x yaw (right +), y pitch (down +).</summary>
+    /// <summary>How far the player turned the view since the last frame, degrees: x yaw (right +), y pitch (down +). The recoil's
+    /// part is left out: the kick is the weapon's own animation, not a turn to sway after.</summary>
     Vector2 ViewTurned()
     {
         float yaw = transform.eulerAngles.y, pitch = fp != null ? fp.Pitch : 0f;
-        var d = new Vector2(Mathf.DeltaAngle(lastYaw, yaw), pitch - lastPitch);
-        lastYaw = yaw; lastPitch = pitch;
+        Vector2 recoil = fp != null ? fp.RecoilTurned : Vector2.zero;
+        var d = new Vector2(Mathf.DeltaAngle(lastYaw, yaw), pitch - lastPitch) - (recoil - lastRecoil);
+        lastYaw = yaw; lastPitch = pitch; lastRecoil = recoil;
         return d;
     }
 
@@ -187,6 +205,7 @@ public class WeaponInventory : MonoBehaviour
     public void ResetSway()
     {
         lastYaw = transform.eulerAngles.y; lastPitch = fp != null ? fp.Pitch : 0f;
+        lastRecoil = fp != null ? fp.RecoilTurned : Vector2.zero;
         turnRate = Vector2.zero;
     }
 
@@ -197,11 +216,7 @@ public class WeaponInventory : MonoBehaviour
     {
         ShotsFired++;
         if (hit) { Hits++; LastHitTime = Time.time; }
-        if (fp != null)
-        {
-            fp.AddRecoil(w.recoil * (1f - 0.5f * Aim));
-            lastPitch = fp.Pitch;                                       // the kick is the weapon's own animation, not a turn to sway after
-        }
+        if (fp != null) fp.AddRecoil(w.LastKick.y * (1f - 0.5f * Aim), w.LastKick.x * (1f - 0.5f * Aim));   // grows through a burst (Weapon.Kick)
         if (w.shotClips != null && w.shotClips.Length > 0)
             PlaySound(w.shotClips[Random.Range(0, w.shotClips.Length)], w.shotVolume, w.shotPitch * Random.Range(0.95f, 1.05f));
     }
