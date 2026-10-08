@@ -70,6 +70,7 @@ public class WaveSurvivalGame : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        if (GetComponent<UpgradeSystem>() == null) gameObject.AddComponent<UpgradeSystem>();   // the upgrades between the waves
         State = GameState.Prepare; TimeLeft = startDelay; Wave = 0;
         if (player != null) health = player.GetComponent<PlayerHealth>();
     }
@@ -153,11 +154,13 @@ public class WaveSurvivalGame : MonoBehaviour
     {
         Kills++;
         if (bot == null) return;
-        float roll = Random.value;                                      // one roll: magazine, medkit, syringe or nothing
-        SupplyPickup drop = roll < dropChance ? ammoPickupPrefab
-                          : roll < dropChance + medkitDropChance ? medkitPrefab
-                          : roll < dropChance + medkitDropChance + speedDropChance ? speedPrefab : null;
+        // one roll: magazine, medkit, syringe or nothing (the Scavenger upgrade makes all three likelier, never more than one)
+        float more = UpgradeSystem.Stats.dropChance, sum = (dropChance + medkitDropChance + speedDropChance) * more;
+        if (sum > 1f) more /= sum;
+        float roll = Random.value, a = dropChance * more, m = a + medkitDropChance * more, s = m + speedDropChance * more;
+        SupplyPickup drop = roll < a ? ammoPickupPrefab : roll < m ? medkitPrefab : roll < s ? speedPrefab : null;
         if (drop != null) SupplyPickup.Spawn(drop, bot.transform.position);
+        if (UpgradeSystem.Instance != null) UpgradeSystem.Instance.OnKill(bot);
     }
 
     void SpawnOnSummit(SupplyPickup prefab, int keep)

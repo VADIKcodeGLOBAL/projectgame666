@@ -143,7 +143,7 @@ public class SurvivalHud : MonoBehaviour
         if (cross && view.crosshairGraphic != null)                      // null: a HUD canvas baked before the crosshair graphic existed
         {
             var hw = weapons != null ? weapons.Current : null; var w = hw as Weapon;
-            float spread = w != null ? Mathf.Lerp(w.spread, w.scopedSpread, weapons.Aim) : 0f;      // the cone Weapon.Fire uses; a blade has none
+            float spread = w != null ? w.SpreadNow(weapons.Aim) : 0f;      // the cone Weapon.Fire uses; a blade has none
             float fov = weapons != null && weapons.cam != null ? weapons.cam.fieldOfView : GameSettings.Fov;
             bool ready = hw != null && hw.CanAttack && !weapons.IsSwitching;
             view.crosshairGraphic.Tick(spread, fov, ready, weapons != null ? weapons.ShotsFired : 0, weapons != null ? weapons.Hits : 0, game.Kills);

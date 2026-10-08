@@ -60,7 +60,18 @@ public class Weapon : HandWeapon
     public int Reserve { get; private set; }
     public override bool IsReloading { get { return reloading; } }
     public override bool CanAttack { get { return !reloading && InMagazine > 0; } }
-    public float ReloadProgress { get { return IsReloading ? Mathf.Clamp01((Time.time - reloadStart) / Mathf.Max(0.01f, reloadTime)) : 0f; } }
+    public float ReloadProgress { get { return IsReloading ? Mathf.Clamp01((Time.time - reloadStart) / ReloadDuration) : 0f; } }
+    /// <summary>How long a reload takes now (the upgrades in).</summary>
+    public float ReloadDuration { get { return Mathf.Max(0.01f, reloadTime / Mathf.Max(0.1f, UpgradeSystem.Stats.reloadSpeed)); } }
+    /// <summary>The spread cone now, degrees: from the hip to the scope (aim 0..1), the upgrades in.</summary>
+    public float SpreadNow(float aim) { return Mathf.Lerp(spread, scopedSpread, aim) * UpgradeSystem.Stats.spread; }
+    /// <summary>A bigger (or smaller) magazine: the new room is filled at once, the spare rounds stay as they are.</summary>
+    public void ScaleMagazine(float k)
+    {
+        int before = magazineSize;
+        magazineSize = Mathf.Max(1, Mathf.RoundToInt(magazineSize * k));
+        InMagazine = Mathf.Clamp(InMagazine + (magazineSize - before), 0, magazineSize);
+    }
     /// <summary>Spare magazines (a part-used one counts as one); -1 when endless.</summary>
     public int Magazines { get { return infiniteReserve ? -1 : (Reserve + magazineSize - 1) / magazineSize; } }
     public bool ReserveFull { get { return infiniteReserve || Reserve >= maxMagazines * magazineSize; } }
@@ -126,17 +137,17 @@ public class Weapon : HandWeapon
     public override void Tick(bool held, bool pressed, bool altHeld, bool altPressed, bool ready, Camera cam, float aim)
     {
         float now = Time.time;
-        if (IsReloading && now >= reloadStart + reloadTime) FinishReload();
+        if (IsReloading && now >= reloadStart + ReloadDuration) FinishReload();
         if (!IsReloading && InMagazine == 0 && now > lastShot + 0.2f && HasSpare) StartReload();   // empty: reload without asking
 
         bool want = ready && !IsReloading && (mode == FireMode.Auto ? held : pressed);
-        float interval = 1f / Mathf.Max(0.05f, roundsPerSecond);
+        float interval = 1f / Mathf.Max(0.05f, roundsPerSecond * UpgradeSystem.Stats.fireRate);
         if (!want) { if (nextShot < now) nextShot = now; return; }
         // fixed cadence whatever the frame rate: the leftover time carries over to the next round
         for (int n = 0; now >= nextShot && n < 4; n++)
         {
             if (InMagazine <= 0) { StartReload(); break; }
-            Fire(cam, Mathf.Lerp(spread, scopedSpread, aim));
+            Fire(cam, SpreadNow(aim));
             nextShot += interval;
             if (mode == FireMode.Semi) break;
         }
@@ -145,7 +156,9 @@ public class Weapon : HandWeapon
 
     void Fire(Camera cam, float spreadDeg)
     {
-        InMagazine--; lastShot = Time.time;
+        var run = UpgradeSystem.Stats;
+        if (!(run.freeAmmoChance > 0f && Random.value < run.freeAmmoChance)) InMagazine--;   // Bullet Hose: now and then a round for free
+        lastShot = Time.time;
         bool hit = false;
         if (cam != null)
         {
@@ -162,8 +175,20 @@ public class Weapon : HandWeapon
                 if (Owner != null && hitBuffer[i].collider.transform.IsChildOf(Owner.transform)) continue;
                 if (hitBuffer[i].distance < dist) dist = hitBuffer[i].distance;
             }
+            float wall = dist, dmg = damage * run.GunDamage;
             var bot = EnemyBot.RaycastBodies(origin, dir, ref dist);
-            if (bot != null) { bot.TakeDamage(damage); hit = true; }
+            if (bot != null)
+            {
+                hit = true;
+                bot.TakeDamage(dmg); UpgradeSystem.OnGunHit(bot, origin + dir * dist, dir, dmg);
+                for (int p = 0; p < run.pierce; p++)                        // piercing rounds: the next bot behind, short of the wall
+                {
+                    float after = dist; dist = wall;
+                    var next = EnemyBot.RaycastBodies(origin, dir, ref dist, after + 0.01f);
+                    if (next == null) break;
+                    next.TakeDamage(dmg); UpgradeSystem.OnGunHit(next, origin + dir * dist, dir, dmg);
+                }
+            }
         }
 
         // muzzle fire: the same texture every round, turned to a random angle and a little bigger or smaller

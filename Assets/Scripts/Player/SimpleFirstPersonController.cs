@@ -54,7 +54,7 @@ public class SimpleFirstPersonController : MonoBehaviour
     /// <summary>Part of the normal speed the weapon in hand allows (a heavy sword is slower); set by WeaponInventory every frame.</summary>
     public float CarrySpeedScale { get; set; } = 1f;
     /// <summary>Walking and sprinting speeds are multiplied by this now (speed supply and the weapon in hand).</summary>
-    public float SpeedScale { get { return SpeedMultiplier * Mathf.Clamp(CarrySpeedScale, 0.1f, 1f); } }
+    public float SpeedScale { get { return SpeedMultiplier * Mathf.Clamp(CarrySpeedScale, 0.1f, 1f) * UpgradeSystem.Stats.moveSpeed; } }
 
     /// <summary>Speed supply: multiplier and seconds left (0 when none).</summary>
     public float SpeedMultiplier { get { return Time.time < boostEnd ? boostMultiplier : 1f; } }
@@ -92,7 +92,7 @@ public class SimpleFirstPersonController : MonoBehaviour
     {
         var game = WaveSurvivalGame.Instance;
         bool over = game != null && game.IsOver;
-        if (Input.GetMouseButtonDown(0) && !SettingsMenu.IsOpen && !over) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
+        if (Input.GetMouseButtonDown(0) && !SettingsMenu.IsOpen && !UpgradeSystem.IsChoosing && !over) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
 
         if (Cursor.lockState == CursorLockMode.Locked)
         {
@@ -140,7 +140,7 @@ public class SimpleFirstPersonController : MonoBehaviour
 
         if (Time.time - jumpPressedTime <= jumpBuffer && Time.time - lastGroundedTime <= coyoteTime && m.VerticalVelocity <= 0f)
         {
-            m.Jump(Mathf.Sqrt(2f * m.gravity * jumpHeight));
+            m.Jump(Mathf.Sqrt(2f * m.gravity * jumpHeight * UpgradeSystem.Stats.jump));
             jumpPressedTime = -10f; lastGroundedTime = -10f;
         }
 

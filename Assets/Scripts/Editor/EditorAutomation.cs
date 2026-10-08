@@ -46,6 +46,8 @@ public static partial class EditorAutomation
     // playtest state
     static Vector3 runDir; static float tA, tB, landT, vRun, vAir, tl0, tl1, hp0, w1Health, w1Speed; static bool wasAir; static int spawnedAtWave2, moveIdx, ownBlocked, ownTicks, moveTicks, groundTicks; static float speedSum; static bool jumpedOk; static Vector3 startPos, endPos; static float[] hitRates = new float[3];
 
+    static bool playTakeUpgrade;                                          // the playtest brings the upgrade put off back and takes it
+
     static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
 
     /// <summary>The player 0.3 m above the terrain at (x, z), landed by the motor.</summary>
@@ -68,6 +70,7 @@ public static partial class EditorAutomation
         if (mode == "cannontest") { SuiteTick(CannonTests, "CANNONTEST"); return; }
         if (mode == "swordtest") { SuiteTick(SwordTests, "SWORDTEST"); return; }
         if (mode == "smoketest") { SuiteTick(SmokeTests, "SMOKETEST"); return; }
+        if (mode == "upgradetest") { SuiteTick(UpgradeTests, "UPGRADETEST"); return; }
         float t = Time.timeSinceLevelLoad;
         if (t < 1.5f) return;
         var game = WaveSurvivalGame.Instance;
@@ -77,10 +80,28 @@ public static partial class EditorAutomation
         Vector3 c = game.zone.transform.position;
         if (t > 120f && playPhase != 9 && playPhase != 10) { Log("PLAYTEST_FAILED: timeout in phase " + playPhase); playPhase = 9; playT = t; return; }
 
+        // a wave held brings the upgrade choice and pauses the game: put off at first (a random upgrade would change the
+        // speeds, rates and reloads measured meanwhile), taken at the end
+        var ups = UpgradeSystem.Instance;
+        if (ups != null && ups.Current != null)
+        {
+            if (ups.Busy) return;
+            var cards = new System.Text.StringBuilder();
+            foreach (var m in ups.Current.cards) cards.Append((cards.Length > 0 ? ", " : "") + m.title + " (" + ModifierCatalog.Name(m.rarity) + ")");
+            if (!playTakeUpgrade)
+            {
+                Log("  playtest upgrade after wave " + ups.Current.wave + ": " + cards + "; paused " + (Time.timeScale == 0f) + ", cursor " + Cursor.lockState + "; put off");
+                if (Time.timeScale != 0f || Cursor.lockState == CursorLockMode.Locked) { Log("PLAYTEST_FAILED: the upgrade choice does not pause the game"); playPhase = 9; playT = t; }
+                ups.Later();
+            }
+            else { Log("  playtest upgrade put off brought back (" + cards + "): takes the first"); ups.Choose(0); playTakeUpgrade = false; }
+            return;
+        }
+
         switch (playPhase)
         {
             case 0:
-                game.waveDuration = 16f; game.batchInterval = 6f; game.intermission = 3f;
+                game.waveDuration = 16f; game.batchInterval = 6f; game.intermission = 3f; playTakeUpgrade = false;
                 runDir = Vector3.right;
                 Teleport(fp, c - runDir * 10f); fp.transform.rotation = Quaternion.LookRotation(runDir);
                 fp.SetTestInput(Vector3.forward, true, false);
@@ -347,10 +368,17 @@ public static partial class EditorAutomation
                 Log("  playtest wave 2: batch " + game.BatchSize + " (wave 1: " + game.mobsPerBatch + "), new bot hp " + F(nb.maxHealth) + " (was " + F(w1Health) + "), speed " + F(nb.speed) + " (was " + F(w1Speed) + "), kills " + game.Kills + ", player hp " + F(hp.Health));
                 ScreenCapture.CaptureScreenshot(ShotDir + "/play_wave2.png");
                 if (!(game.BatchSize == game.mobsPerBatch * 2 && nb.maxHealth > w1Health && nb.speed > w1Speed)) { Log("PLAYTEST_FAILED: wave 2 is not stronger"); playPhase = 9; playT = t; break; }
+                if (ups == null || ups.Offered < 1 || ups.Waiting.Count < 1) { Log("PLAYTEST_FAILED: no upgrade was offered after wave 1 (or it was not put off)"); playPhase = 9; playT = t; break; }
+                playTakeUpgrade = true; ups.OpenWaiting(); playPhase = 27; break;
+            case 27:                                                       // the upgrade put off: brought back and taken
+            {
+                if (UpgradeSystem.IsChoosing || ups == null || ups.taken.Count < 1) break;
+                Log("  playtest upgrade taken: " + ups.taken[0] + ", the game runs again (time scale " + Time.timeScale + ")");
                 var sm = UnityEngine.Object.FindFirstObjectByType<SettingsMenu>();
                 if (sm == null) { Log("PLAYTEST_FAILED: no settings menu"); playPhase = 9; playT = t; break; }
                 sm.Open(); playPhase = 25; playT = Time.realtimeSinceStartup; break;
-            case 25:                                                       // settings menu: pauses the game, shows, closes
+            }
+            case 25:                                                      // settings menu: pauses the game, shows, closes
             {
                 if (Time.realtimeSinceStartup < playT + 0.5f) break;
                 ScreenCapture.CaptureScreenshot(ShotDir + "/play_settings.png");   // taken at the end of this frame, with the menu up
@@ -475,6 +503,7 @@ public static partial class EditorAutomation
             else if (cmd == "cannontest") { moveTestRunner = null; ArmPlaytest("cannontest"); }
             else if (cmd == "swordtest") { moveTestRunner = null; ArmPlaytest("swordtest"); }
             else if (cmd == "smoketest") { moveTestRunner = null; ArmPlaytest("smoketest"); }
+            else if (cmd == "upgradetest") { moveTestRunner = null; ArmPlaytest("upgradetest"); }
             else if (cmd == "cannon") CannonSetup.InstallInOpenScene();
             else if (cmd == "cannon-view") CannonSetup.ViewShots();
             else if (cmd == "zone") KothMapGenerator.RebuildZoneInOpenScene();

@@ -42,13 +42,16 @@ public class EnemyBot : MonoBehaviour
     /// Nearest living bot whose body box the ray (unit dir) crosses closer than maxDist; maxDist becomes the distance to it.
     /// The box is the rendered cube, so a round that visibly touches a corner hits, one that passes beside the box misses.
     /// </summary>
-    public static EnemyBot RaycastBodies(Vector3 origin, Vector3 dir, ref float maxDist)
+    public static EnemyBot RaycastBodies(Vector3 origin, Vector3 dir, ref float maxDist) { return RaycastBodies(origin, dir, ref maxDist, -1f); }
+
+    /// <summary>The same among the bots whose box the ray enters further than after: the next one behind a hit bot (piercing rounds).</summary>
+    public static EnemyBot RaycastBodies(Vector3 origin, Vector3 dir, ref float maxDist, float after)
     {
         EnemyBot best = null;
         for (int i = 0; i < All.Count; i++)
         {
             var b = All[i]; float t;
-            if (b.RayHitsBody(origin, dir, maxDist, out t)) { best = b; maxDist = t; }
+            if (b.RayHitsBody(origin, dir, maxDist, out t) && t > after) { best = b; maxDist = t; }
         }
         return best;
     }
@@ -220,13 +223,14 @@ public class EnemyBot : MonoBehaviour
             Vector3 move = (dir + sep * 0.9f); move.y = 0f;
             if (move.sqrMagnitude > 1f) move.Normalize();
             vy = cc.isGrounded ? -2f : vy - 25f * dt;
-            using (MoveMarker.Auto()) cc.Move((move * speed + Vector3.up * vy) * dt);
+            float pace = speed * UpgradeSystem.Stats.botSpeed;                 // Time Warp slows them all
+            using (MoveMarker.Auto()) cc.Move((move * pace + Vector3.up * vy) * dt);
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Mathf.Min(1f, dt * 8f));
 
             if (Time.time >= stuckCheck)                              // blocked by a rock, a tree or a wall of rocks: go around
             {
                 Vector3 moved = transform.position - lastPos; moved.y = 0f;
-                if (moved.magnitude < speed * 0.25f) { sidestepUntil = Time.time + Random.Range(1.2f, 2.2f); sideSign = -sideSign; }
+                if (moved.magnitude < pace * 0.25f) { sidestepUntil = Time.time + Random.Range(1.2f, 2.2f); sideSign = -sideSign; }
                 lastPos = transform.position; stuckCheck = Time.time + 1f;
             }
         }

@@ -54,8 +54,8 @@ public class MeleeWeapon : HandWeapon
     public int BotsHit { get; private set; }
     /// <summary>0..1 how far the current strike has swept (0 outside the strike).</summary>
     public float StrikeProgress { get; private set; }
-    public override float MoveSpeedScale { get { return moveScale; } }
-    public override float DrawTimeScale { get { return drawTime; } }
+    public override float MoveSpeedScale { get { return UpgradeSystem.Stats.featherweight ? 1f : moveScale; } }     // Featherweight: no weight
+    public override float DrawTimeScale { get { return UpgradeSystem.Stats.featherweight ? 1f : drawTime; } }
     public override bool CanAttack { get { return State == Swing.None; } }
 
     static AudioClip swish, impact;
@@ -114,7 +114,8 @@ public class MeleeWeapon : HandWeapon
     {
         if (s == Swing.Chop) { windup = chopWindup; strike = chopStrike; recover = chopRecover; }
         else { windup = slashWindup; strike = slashStrike; recover = slashRecover; }
-        windup = Mathf.Max(0.01f, windup); strike = Mathf.Max(0.01f, strike); recover = Mathf.Max(0.01f, recover);
+        float quick = Mathf.Max(0.1f, UpgradeSystem.Stats.meleeSpeed);    // the upgrades: faster swings
+        windup = Mathf.Max(0.01f, windup / quick); strike = Mathf.Max(0.01f, strike / quick); recover = Mathf.Max(0.01f, recover / quick);
     }
 
     void StrikePose(Swing s, float k, out Vector3 pos, out Quaternion rot)
@@ -199,7 +200,8 @@ public class MeleeWeapon : HandWeapon
         if (cam == null) return;
         var eye = cam.transform;
         bool chop = State == Swing.Chop;
-        float reach = chop ? chopReach : slashReach;
+        bool whirl = UpgradeSystem.Stats.whirlwind;                    // Whirlwind: the slash goes all the way round, the chop reaches far
+        float reach = chop ? (whirl ? Mathf.Max(chopReach, 5f) : chopReach) : slashReach;
         float yawA = chop ? -chopArc * 0.5f : Mathf.Min(SlashYaw(0f, State == Swing.SlashRightToLeft), SlashYaw(s, State == Swing.SlashRightToLeft));
         float yawB = chop ? chopArc * 0.5f : Mathf.Max(SlashYaw(0f, State == Swing.SlashRightToLeft), SlashYaw(s, State == Swing.SlashRightToLeft));
         if (chop && s < 0.25f) return;                                 // the chop only bites once it comes over the top
@@ -215,11 +217,12 @@ public class MeleeWeapon : HandWeapon
             float yaw = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
             float pitch = Mathf.Atan2(local.y, new Vector2(local.x, local.z).magnitude) * Mathf.Rad2Deg;
             bool close = dist < 0.6f && Mathf.Abs(yaw) < 100f;           // pressed against you: any swing catches it
-            if (!close && (yaw < yawA || yaw > yawB || pitch < -70f || pitch > (chop ? 50f : 45f))) continue;
+            bool around = whirl && !chop && s > 0.5f;                  // the second half of a whirlwind slash sweeps the rest of the circle
+            if (!close && !around && (yaw < yawA || yaw > yawB || pitch < -70f || pitch > (chop ? 50f : 45f))) continue;
             if (Blocked(eye.position, centre)) continue;
             hitThisSwing.Add(bot);
             Vector3 push = centre - eye.position; push.y = 0f;
-            bot.TakeDamage(chop ? chopDamage : slashDamage);
+            bot.TakeDamage((chop ? chopDamage : slashDamage) * UpgradeSystem.Stats.MeleeDamage);
             bot.Knockback(push.normalized * (chop ? chopKnockback : slashKnockback), chop ? chopStagger : slashStagger);
             hits++;
         }

@@ -281,7 +281,7 @@ public class FieldCannon : MonoBehaviour
     {
         if (Pressed(KeyCode.E)) { Release(); return; }
         bool locked = Cursor.lockState == CursorLockMode.Locked;
-        if (!locked && Input.GetMouseButtonDown(0) && !SettingsMenu.IsOpen) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
+        if (!locked && Input.GetMouseButtonDown(0) && !SettingsMenu.IsOpen && !UpgradeSystem.IsChoosing) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
 
         // ---- the view
         bool zoom = locked && Input.GetMouseButton(1);

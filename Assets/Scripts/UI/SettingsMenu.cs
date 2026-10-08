@@ -19,6 +19,7 @@ public class SettingsMenu : MonoBehaviour
 
     void Update()
     {
+        if (UpgradeSystem.IsChoosing) return;                             // the upgrade choice has the screen
         if (Input.GetKeyDown(KeyCode.Escape)) { if (IsOpen) Close(); else Open(); }
     }
 

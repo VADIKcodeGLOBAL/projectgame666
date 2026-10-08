@@ -62,7 +62,7 @@ public class SupplyPickup : MonoBehaviour
             case Kind.Medkit:
                 var hp = inv.Health;
                 if (hp == null || hp.IsDead || hp.IsFull) return false;
-                float before = hp.Health; hp.Heal(heal);
+                float before = hp.Health; hp.Heal(heal * UpgradeSystem.Stats.healing);
                 Announce("+" + Mathf.RoundToInt(hp.Health - before) + " HP  MILK", kind); return true;
             case Kind.Speed:
                 var fp = inv.Controller;
