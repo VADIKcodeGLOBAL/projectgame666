@@ -9,7 +9,9 @@ using UnityEngine;
 ///  - steeper surfaces are walls: they stop the walk (no climbing them) and in the air you slide down them;
 ///  - ledges up to stepHeight are stepped onto; the camera (smoothedChild) is eased over the step;
 ///  - in the air: exact ballistic arc (jump height does not depend on the frame rate), ceilings stop the rise,
-///    walls clip the velocity (sliding along them, stopping in corners);
+///    walls clip the velocity (sliding along them, stopping in corners); walkable ground lands the character with its
+///    horizontal speed kept, also while still rising (a slope that rises faster than the arc);
+///  - a jump while running uphill keeps the climb: as high over the slope as on the flat;
 ///  - overlaps (something moved into the capsule) are resolved first, along the shortest way out.
 /// The owner sets PlanarVelocity (and calls Jump) and then Move(dt) once per frame.
 /// Collides with everything in collisionMask except triggers and its own collider; the bots are on the Ignore Raycast layer
@@ -66,8 +68,16 @@ public class CharacterMotor : MonoBehaviour
         if (smoothedChild != null) { smoothBase = smoothedChild.localPosition; smoothReady = true; }
     }
 
-    /// <summary>Starts a jump (vertical speed in m/s) on the next Move, also from the air (the caller decides when that is allowed).</summary>
-    public void Jump(float upSpeed) { vertical = upSpeed; jumpRequested = true; grounded = false; }
+    /// <summary>
+    /// Starts a jump (vertical speed in m/s) on the next Move, also from the air (the caller decides when that is allowed).
+    /// Running uphill, the climb is kept on top of it, so the jump is as high over the slope as on the flat (from rest it would
+    /// barely clear a steep slope); downhill it starts from rest, a longer flight down the slope.
+    /// </summary>
+    public void Jump(float upSpeed)
+    {
+        if (grounded) upSpeed += Mathf.Max(0f, AlongSlope(planar, groundNormal).y);
+        vertical = upSpeed; jumpRequested = true; grounded = false;
+    }
 
     /// <summary>Puts the character at p (feet) with no velocity and lands it on the ground just below, if there is any.</summary>
     public void Teleport(Vector3 p)
@@ -215,7 +225,7 @@ public class CharacterMotor : MonoBehaviour
     /// <summary>
     /// Moves by delta, sliding along what it hits. Ground mode: the motion follows walkable ground (horizontal part kept),
     /// steep faces are walls. Air mode: velocity and motion are clipped by every surface; touching walkable ground while
-    /// falling lands the character (ground mode for the rest of the move, the horizontal speed kept as it was).
+    /// falling or moving into it lands the character (ground mode for the rest of the move, the horizontal speed kept as it was).
     /// </summary>
     Vector3 SlideMove(Vector3 pos, Vector3 delta, ref bool groundMode, ref bool climbed)
     {
@@ -236,9 +246,11 @@ public class CharacterMotor : MonoBehaviour
             Vector3 n = hit.normal;
             bool walkable = n.y >= MinWalkableY;
 
-            if (!groundMode && walkable && vertical <= 0f)
+            // landed during the move: falling onto walkable ground, or running into ground that rises faster than we do (a slope
+            // steeper than the arc) — clipping against it instead would eat the horizontal speed and keep us "airborne" on it
+            if (!groundMode && walkable && (vertical <= 0f || Vector3.Dot(planar + Vector3.up * vertical, n) < 0f))
             {
-                groundMode = true; vertical = 0f;                      // landed during the move
+                groundMode = true; vertical = 0f;
                 groundNormal = n; groundCollider = hit.collider;
                 delta = AlongSlope(delta, groundNormal);
                 planeCount = 0;

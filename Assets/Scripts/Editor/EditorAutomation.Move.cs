@@ -15,8 +15,9 @@ public static partial class EditorAutomation
     /// <summary>
     /// "movetest": the movement suite in Play mode, with the wave game switched off. Slopes of several steepness levels
     /// (standing still: no drift), walking across a slope (no drift up or down), sprinting up and down (same speed, always on the ground),
-    /// jump height at 30 / 60 / 144 fps, a running jump downhill, a wall at 45 degrees and a corner, a 0.3 m step (walked onto, camera eased)
-    /// and a 0.6 m block (stops), a low ceiling, a bot in the way, ramps of 30 degrees (walkable) and 60 degrees (slides, cannot be climbed).
+    /// jump height at 30 / 60 / 144 fps, running jumps downhill and uphill (as high over the slope as on the flat, no speed lost),
+    /// a wall at 45 degrees and a corner, a 0.3 m step (walked onto, camera eased) and a 0.6 m block (stops), a low ceiling,
+    /// a bot in the way, ramps of 30 degrees (walkable) and 60 degrees (slides, cannot be climbed), a running jump into a 45 degree ramp.
     /// Test geometry is built on the summit plateau and disappears with the Play session.
     /// </summary>
     static void MoveTick() { SuiteTick(MoveTests, "MOVETEST"); }
@@ -201,6 +202,28 @@ public static partial class EditorAutomation
             yield return Wait(0.2f);
             float after = fp.PlanarVelocity.magnitude;
             Check(left && landed && after > fp.sprintSpeed * 0.9f, "running jump downhill on " + s.angle.ToString("0.0") + " deg: took off " + left + ", landed " + landed + " after " + F3(Time.time - tj - 0.2f) + " s, speed after " + F3(after));
+
+            // running jump uphill: as high over the slope as on the flat, no speed lost in the air or on landing
+            fp.ClearTestInput(); fp.Teleport(s.point + s.downhill * 4f + Vector3.up * 0.3f); fp.transform.rotation = Quaternion.LookRotation(-s.downhill);
+            yield return Wait(0.4f);
+            fp.SetTestInput(Vector3.forward, true, false);
+            yield return Wait(0.5f);
+            Func<Vector3, float> overGround = p => p.y - t.SampleHeight(p) - t.transform.position.y;
+            float rest = overGround(fp.transform.position);            // feet over the terrain while running (round bottom on a slope)
+            fp.SetTestInput(Vector3.forward, true, true);
+            left = false; landed = false; tj = Time.time;
+            float slowest = float.MaxValue, clearance = 0f;
+            while (Time.time < tj + 2f && !landed)
+            {
+                yield return null;
+                slowest = Mathf.Min(slowest, fp.PlanarVelocity.magnitude);
+                clearance = Mathf.Max(clearance, overGround(fp.transform.position) - rest);
+                if (!fp.IsGrounded) left = true; else if (left) landed = true;
+            }
+            float tl = Time.time - tj;
+            yield return Run(0.2f, () => slowest = Mathf.Min(slowest, fp.PlanarVelocity.magnitude));
+            Check(left && landed && slowest > fp.sprintSpeed * 0.97f && clearance > fp.jumpHeight * 0.8f,
+                  "running jump uphill on " + s.angle.ToString("0.0") + " deg: took off " + left + ", landed " + landed + " after " + F3(tl) + " s, " + F3(clearance) + " m over the slope (jump " + fp.jumpHeight + "), slowest " + F3(slowest) + " m/s (sprint " + fp.sprintSpeed + ")");
             fp.ClearTestInput();
         }
 
@@ -339,6 +362,30 @@ public static partial class EditorAutomation
                 float slid = y0 - fp.transform.position.y;
                 Check(slid > 0.5f && onGround == 0 && ticks > 10, "ramp " + ang + " deg: placed on it, slid down " + F3(slid) + " m in 0.6 s, 'on the ground' while on the ramp " + onGround + "/" + ticks);
             }
+            fp.ClearTestInput(); Object.Destroy(ramp); yield return Wait(0.2f); Physics.SyncTransforms();
+        }
+
+        // ---- 9b. a running jump at the foot of a 45 deg ramp (its surface rises faster than the jump): on it while still
+        //          rising, running up at full speed — not stuck "in the air" on it, slowed down by every touch
+        {
+            float ang = 45f, L = 6f, th = 0.3f;
+            Quaternion q = Quaternion.LookRotation(Fw) * Quaternion.Euler(-ang, 0f, 0f);
+            Vector3 foot = new Vector3(c.x, gy - 0.02f, c.z + 1.5f);
+            var ramp = Block("JumpRamp", foot - q * (Vector3.up * th * 0.5f - Vector3.forward * L * 0.5f), new Vector3(3f, th, L), q);
+            fp.Teleport(new Vector3(c.x, gy + 0.3f, c.z - 4f)); fp.transform.rotation = Quaternion.LookRotation(Fw);
+            yield return Wait(0.4f);
+            fp.SetTestInput(Vector3.forward, true, false);
+            float tr = Time.time;
+            while (fp.transform.position.z + rad < foot.z - 0.1f && Time.time < tr + 2f) yield return null;
+            fp.SetTestInput(Vector3.forward, true, true);
+            float tj = Time.time, y0 = fp.transform.position.y, slowest = float.MaxValue, onRamp = -1f; bool left = false;
+            yield return Run(0.35f, () =>                              // ~3 m: still on the ramp (4.2 m long over the ground)
+            {
+                slowest = Mathf.Min(slowest, fp.PlanarVelocity.magnitude);
+                if (!fp.IsGrounded) left = true; else if (left && onRamp < 0f) onRamp = Time.time - tj;
+            });
+            Check(left && onRamp > 0f && fp.IsGrounded && slowest > fp.sprintSpeed * 0.97f,
+                  "running jump into a 45 deg ramp: took off " + left + ", on the ramp after " + F3(onRamp) + " s, climbed " + F3(fp.transform.position.y - y0) + " m in 0.35 s, slowest " + F3(slowest) + " m/s (sprint " + fp.sprintSpeed + ")");
             fp.ClearTestInput(); Object.Destroy(ramp); yield return Wait(0.2f); Physics.SyncTransforms();
         }
 
