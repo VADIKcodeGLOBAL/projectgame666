@@ -57,7 +57,7 @@ public static class SwordSetup
         Vector3 flatDir = axes[thin];
         holder.localRotation = Quaternion.Inverse(Quaternion.LookRotation(flatDir, bladeDir));
         b = r.bounds;
-        foreach (var rr in model.GetComponentsInChildren<Renderer>()) { rr.shadowCastingMode = ShadowCastingMode.Off; rr.lightProbeUsage = LightProbeUsage.BlendProbes; }
+        foreach (var rr in model.GetComponentsInChildren<Renderer>()) { rr.shadowCastingMode = ShadowCastingMode.Off; rr.receiveShadows = false; rr.lightProbeUsage = LightProbeUsage.BlendProbes; }
 
         var tip = new GameObject("Tip").transform; tip.SetParent(root.transform, false); tip.localPosition = new Vector3(0f, b.max.y - 0.03f, 0f);
         var trail = tip.gameObject.AddComponent<TrailRenderer>();

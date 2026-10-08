@@ -105,6 +105,7 @@ public class Smoking : MonoBehaviour
 
         float dt = Time.deltaTime;
         if (dt <= 0f) return;
+        if (Current == Phase.None && glowNow <= 0f && !FlameOn) return;  // nothing in hand, nothing glowing: nothing to do
         if (Lit)
         {
             float rate = IsDrawing ? (paperLength - stubLength) * (1f - idleBurnShare) / Mathf.Max(1, drags) / Mathf.Max(0.1f, inhaleTime) : idleRate;

@@ -300,6 +300,7 @@ public class UpgradeSystem : MonoBehaviour
     class Fx { public GameObject go; public Renderer r; public LineRenderer line; public Light light; public float start, life, size; public bool on; }
     readonly List<Fx> arcs = new List<Fx>(), bursts = new List<Fx>();
     Material arcMat, burstMat;
+    bool fxLive;
     MaterialPropertyBlock block;
     static readonly int ColorId = Shader.PropertyToID("_Color"), IntensityId = Shader.PropertyToID("_Intensity");
     static Texture2D softTex;
@@ -355,7 +356,7 @@ public class UpgradeSystem : MonoBehaviour
 
     void Arc(Vector3 a, Vector3 b)
     {
-        var f = Take(arcs, true); f.on = true; f.start = Time.time; f.life = 0.16f; f.go.SetActive(true);
+        var f = Take(arcs, true); f.on = true; fxLive = true; f.start = Time.time; f.life = 0.16f; f.go.SetActive(true);
         Vector3 d = b - a, side = Vector3.Cross(d, Vector3.up).normalized; if (side.sqrMagnitude < 0.01f) side = Vector3.right;
         for (int i = 0; i < 9; i++)
         {
@@ -366,12 +367,14 @@ public class UpgradeSystem : MonoBehaviour
 
     void Burst(Vector3 at, float radius)
     {
-        var f = Take(bursts, false); f.on = true; f.start = Time.time; f.life = 0.2f; f.size = radius * 2f; f.go.SetActive(true);
+        var f = Take(bursts, false); f.on = true; fxLive = true; f.start = Time.time; f.life = 0.2f; f.size = radius * 2f; f.go.SetActive(true);
         f.go.transform.position = at; f.light.range = radius * 3f;
     }
 
     void LateUpdate()
     {
+        if (!fxLive) return;                                           // nothing flashing: nothing to do
+        fxLive = false;
         if (block == null) block = new MaterialPropertyBlock();
         var cam = inv != null && inv.cam != null ? inv.cam : Camera.main;
         for (int i = 0; i < arcs.Count; i++)
@@ -379,7 +382,7 @@ public class UpgradeSystem : MonoBehaviour
             var f = arcs[i]; if (!f.on) continue;
             float k = (Time.time - f.start) / f.life;
             if (k >= 1f) { f.on = false; f.go.SetActive(false); continue; }
-            Color c = new Color(1f, 1f, 1f, 1f - k); f.line.startColor = c; f.line.endColor = c;
+            Color c = new Color(1f, 1f, 1f, 1f - k); f.line.startColor = c; f.line.endColor = c; fxLive = true;
         }
         for (int i = 0; i < bursts.Count; i++)
         {
@@ -390,7 +393,7 @@ public class UpgradeSystem : MonoBehaviour
             q.localScale = Vector3.one * f.size * (0.4f + 0.6f * Mathf.Sqrt(k));
             if (cam != null) q.rotation = cam.transform.rotation;
             f.r.GetPropertyBlock(block); block.SetFloat(IntensityId, 2.4f * (1f - k)); f.r.SetPropertyBlock(block);
-            f.light.intensity = 3f * (1f - k);
+            f.light.intensity = 3f * (1f - k); fxLive = true;
         }
     }
 }

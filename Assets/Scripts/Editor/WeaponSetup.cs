@@ -314,6 +314,7 @@ public static class WeaponSetup
         vc.clearFlags = CameraClearFlags.Depth; vc.cullingMask = 1 << layer; vc.depth = main.depth + 1f;
         vc.nearClipPlane = 0.01f; vc.farClipPlane = 10f; vc.fieldOfView = 80f;
         vc.allowHDR = false; vc.allowMSAA = main.allowMSAA; vc.useOcclusionCulling = false;
+        if (go.GetComponent<ShadowlessCamera>() == null) go.AddComponent<ShadowlessCamera>();   // no depth pass or shadow collection for the guns
         main.cullingMask &= ~(1 << layer);
         var fx = main.GetComponent<EdgeBlurEffect>();
         if (fx != null)
@@ -374,7 +375,9 @@ public static class WeaponSetup
         b = WorldBounds(model);
         holder.localPosition = -b.center;                                           // the weapon's pivot is its middle
         b = WorldBounds(model);
-        foreach (var r in model.GetComponentsInChildren<Renderer>()) { r.shadowCastingMode = ShadowCastingMode.Off; r.lightProbeUsage = LightProbeUsage.BlendProbes; }
+        // no shadows either way: the view model camera sees only this layer, so a shadow on the gun would cost it a depth pass
+        // and a shadow collection of its own for nothing
+        foreach (var r in model.GetComponentsInChildren<Renderer>()) { r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false; r.lightProbeUsage = LightProbeUsage.BlendProbes; }
 
         var muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(root.transform, false);
         muzzle.localPosition = MuzzlePoint(model, sp.muzzleMesh) + sp.muzzleNudge;
@@ -403,12 +406,26 @@ public static class WeaponSetup
         return w;
     }
 
+    /// <summary>A shot sound loaded with the scene and decompressed then: otherwise the first round of each one reads the file
+    /// and decodes it right in the fight (a hitch).</summary>
+    public static void PreloadSound(string path)
+    {
+        var ai = AssetImporter.GetAtPath(path) as AudioImporter;
+        if (ai == null) return;
+        var st = ai.defaultSampleSettings;
+        if (st.preloadAudioData && !ai.loadInBackground && st.loadType == AudioClipLoadType.DecompressOnLoad) return;
+        ai.loadInBackground = false;
+        st.preloadAudioData = true; st.loadType = AudioClipLoadType.DecompressOnLoad; ai.defaultSampleSettings = st;
+        ai.SaveAndReimport();
+    }
+
     /// <summary>The weapons under the player's view model camera (with the arms) and the inventory that drives them.</summary>
     public static WeaponInventory BuildPlayerWeapons(GameObject player, Camera camera)
     {
         var fx = MakeFx();
-        var clips = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/SFX/Weapons" })
-            .Select(g => AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(g))).Where(c => c != null).ToArray();
+        var clipPaths = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/SFX/Weapons" }).Select(AssetDatabase.GUIDToAssetPath).ToArray();
+        foreach (var p in clipPaths) PreloadSound(p);
+        var clips = clipPaths.Select(p => AssetDatabase.LoadAssetAtPath<AudioClip>(p)).Where(c => c != null).ToArray();
         var audio = player.GetComponent<AudioSource>();
         if (audio == null) audio = player.AddComponent<AudioSource>();
         audio.playOnAwake = false; audio.spatialBlend = 0f;

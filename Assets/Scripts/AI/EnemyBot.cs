@@ -30,13 +30,34 @@ public class EnemyBot : MonoBehaviour
     float vy, nextAttack, flash, stuckCheck, sidestepUntil, sideSign = 1f, dieTime, pendingDt;
     Vector3 lastPos, baseScale;
     int gridIndex = -1, lodSlot;
-    /// <summary>Within this distance of the player a bot is updated every frame, farther every third frame.</summary>
-    const float FullRateDistance = 40f;
+    /// <summary>Within FullRateDistance of the player a bot is updated every frame, up to ThirdRateDistance every third frame,
+    /// farther every sixth (with the time saved up): the bots walk in from 250 m, most of them are far most of the time.</summary>
+    const float FullRateDistance = 40f, ThirdRateDistance = 100f;
+    static readonly Unity.Profiling.ProfilerMarker TickMarker = new Unity.Profiling.ProfilerMarker("EnemyBot.TickAll");
+    static BotDirector director;
 
     // Ignore Raycast: the capsule only moves the bot, bullets test the visible box (RaycastBodies)
     void Awake() { gameObject.layer = 2; }
-    void OnEnable() { All.Add(this); }
+    void OnEnable()
+    {
+        All.Add(this);
+        if (director == null && Application.isPlaying) director = new GameObject("BotDirector").AddComponent<BotDirector>();
+    }
     void OnDisable() { All.Remove(this); }
+
+    /// <summary>Every bot's frame, from BotDirector's one Update: 200 MonoBehaviour Updates would cost a native call each.</summary>
+    public static void TickAll(float dt)
+    {
+        using (TickMarker.Auto())
+        {
+            if (gridFrame != Time.frameCount) BuildGrid();
+            for (int i = All.Count - 1; i >= 0; i--)                     // Destroy is deferred: the list does not change meanwhile
+            {
+                var b = All[i];
+                if (b != null) b.Tick(dt);
+            }
+        }
+    }
 
     /// <summary>
     /// Nearest living bot whose body box the ray (unit dir) crosses closer than maxDist; maxDist becomes the distance to it.
@@ -89,7 +110,7 @@ public class EnemyBot : MonoBehaviour
         maxHealth = health; Health = health; speed = moveSpeed; damage = hitDamage; glow = glowColor;
         transform.localScale = Vector3.one * size; baseScale = transform.localScale;
         lastPos = transform.position; stuckCheck = Time.time + 1f; sideSign = Random.value < 0.5f ? -1f : 1f;
-        lodSlot = Random.Range(0, 3); pendingDt = 0f;                  // spread the far bots over the three frames
+        lodSlot = Random.Range(0, 6); pendingDt = 0f;                  // spread the far bots over the frames they skip
         ApplyLook();
     }
 
@@ -179,9 +200,8 @@ public class EnemyBot : MonoBehaviour
         return sep;
     }
 
-    void Update()
+    void Tick(float dt)
     {
-        float dt = Time.deltaTime;
         if (flash > 0f) { flash = Mathf.MoveTowards(flash, 0f, dt * 7f); ApplyLook(); }
         if (IsDying)
         {
@@ -194,10 +214,12 @@ public class EnemyBot : MonoBehaviour
 
         Vector3 pos = transform.position, to = target.position - pos; to.y = 0f;
         float dist = to.magnitude;
-        // far from the player a bot thinks and moves every third frame, with the time saved up: a third of the CharacterController cost
+        // far from the player a bot thinks and moves every third / sixth frame, with the time saved up: a third / a sixth of the
+        // CharacterController cost; a far step may be longer (it is seen from far away), a near one stays short after a hitch
         pendingDt += dt;
-        if (dist > FullRateDistance && (Time.frameCount + lodSlot) % 3 != 0) return;
-        dt = Mathf.Min(pendingDt, 0.1f); pendingDt = 0f;
+        int every = dist <= FullRateDistance ? 1 : dist <= ThirdRateDistance ? 3 : 6;
+        if (every > 1 && (Time.frameCount + lodSlot) % every != 0) return;
+        dt = Mathf.Min(pendingDt, every == 1 ? 0.1f : 0.25f); pendingDt = 0f;
 
         if (knock.sqrMagnitude > 1e-4f)                                 // thrown back by a blow: slides, decelerating
         {
