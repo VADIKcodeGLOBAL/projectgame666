@@ -341,7 +341,6 @@ public class CharacterMotor : MonoBehaviour
         if (probe > 0f && ProbeGround(pos, probe, out g, out n))
         {
             float gap = g.distance - skin;
-            if (walking && gap > 0.1f) smoothOffset += gap;            // a step down: ease the camera
             pos.y -= gap;
             Land(g, n);
         }
@@ -351,7 +350,13 @@ public class CharacterMotor : MonoBehaviour
             if (walking) vertical = 0f;                                // walked off an edge: start falling from rest
         }
 
-        if (LastStep > 0f) smoothOffset -= LastStep;
+        if (walking && grounded)
+        {
+            // height changes that are not the ground under the feet being followed — a step up or down, an edge rolled over
+            // (up or down, over a few frames), a drop the snap pulled us onto — go to the eased camera, both ways
+            float excess = pos.y - expectedY;
+            if (Mathf.Abs(excess) > 0.02f) smoothOffset -= excess;
+        }
         transform.position = pos;
         ApplySmoothing(dt);
     }

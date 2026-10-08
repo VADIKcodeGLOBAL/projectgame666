@@ -56,6 +56,8 @@ public class Weapon : MonoBehaviour
     public int Magazines { get { return infiniteReserve ? -1 : (Reserve + magazineSize - 1) / magazineSize; } }
     public bool ReserveFull { get { return infiniteReserve || Reserve >= maxMagazines * magazineSize; } }
     public bool HasSpare { get { return infiniteReserve || Reserve > 0; } }
+    /// <summary>How far the sway has turned the gun from its resting pose, degrees.</summary>
+    public float SwayTiltNow { get; private set; }
 
     static readonly RaycastHit[] hitBuffer = new RaycastHit[16];
     Vector3 restPos; Quaternion restRot; Vector3 magRest; Renderer[] modelRenderers, magRenderers;
@@ -178,7 +180,9 @@ public class Weapon : MonoBehaviour
                     + new Vector3(-0.03f, -0.09f, -0.03f) * dip + new Vector3(0f, -0.30f, -0.05f) * low;
         p = Vector3.Lerp(p, new Vector3(0f, -0.06f, restPos.z), aim * 0.7f);    // towards the eye while the scope comes up
         transform.localPosition = p;
-        transform.localRotation = Quaternion.Euler(swayTilt * (1f - aim)) * restRot * Quaternion.Euler(-kickPitch * kickAmount + 18f * dip + 30f * low, -10f * dip, -32f * dip);
+        Quaternion swayRot = Quaternion.Euler(swayTilt * (1f - aim));
+        SwayTiltNow = Quaternion.Angle(Quaternion.identity, swayRot);
+        transform.localRotation = swayRot * restRot * Quaternion.Euler(-kickPitch * kickAmount + 18f * dip + 30f * low, -10f * dip, -32f * dip);
 
         bool show = aim < 0.85f;                                            // through the scope the gun itself is not drawn
         if (show != modelVisible) { modelVisible = show; foreach (var mr in modelRenderers) if (mr != null) mr.enabled = show; }

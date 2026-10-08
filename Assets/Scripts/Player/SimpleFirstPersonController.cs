@@ -110,8 +110,11 @@ public class SimpleFirstPersonController : MonoBehaviour
         if (transform.position.y < killHeight) Respawn();
     }
 
+    /// <summary>Raised after every teleport (respawn included): what follows the view (the weapon sway) takes it as a fresh start.</summary>
+    public event System.Action Teleported;
+
     /// <summary>Puts the player at p (feet) standing still, landed on the ground just below.</summary>
-    public void Teleport(Vector3 p) { Motor.Teleport(p); }
+    public void Teleport(Vector3 p) { Motor.Teleport(p); if (Teleported != null) Teleported(); }
 
     public void Respawn() { Teleport(startPosition + Vector3.up * 0.2f); }
 }

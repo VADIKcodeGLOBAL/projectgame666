@@ -15,11 +15,12 @@ public class WeaponInventory : MonoBehaviour
     public float scopeTime = 0.18f;
 
     [Header("Sway")]
-    [Tooltip("The gun lags behind the turning view: degrees of tilt per 100 °/s of turning.")] public float swayAngle = 1.2f;
-    [Tooltip("The gun slides the other way while turning: metres per 100 °/s of turning.")] public float swayShift = 0.006f;
-    [Tooltip("Most the gun tilts away from the view, degrees.")] public float swayMaxAngle = 4f;
-    [Tooltip("Side lean of the gun into a turn, part of the tilt.")] public float swayRoll = 0.6f;
-    [Tooltip("How fast the gun follows the view and comes back to rest, 1/s; lower is softer and lazier.")] public float swaySmoothing = 9f;
+    [Tooltip("The gun lags behind the turning view: degrees of tilt per 100 °/s of turning.")] [Min(0f)] public float swayAngle = 1.2f;
+    [Tooltip("The gun slides the other way while turning: metres per 100 °/s of turning.")] [Min(0f)] public float swayShift = 0.006f;
+    [Tooltip("Most the gun tilts away from the view, degrees.")] [Min(0f)] public float swayMaxAngle = 4f;
+    [Tooltip("Most the gun slides away from its place, metres.")] [Min(0f)] public float swayMaxShift = 0.02f;
+    [Tooltip("Side lean of the gun into a turn, part of the tilt.")] [Range(0f, 2f)] public float swayRoll = 0.6f;
+    [Tooltip("How fast the gun follows the view and comes back to rest, 1/s; lower is softer and lazier.")] [Min(0.5f)] public float swaySmoothing = 9f;
 
     public static WeaponInventory Instance { get; private set; }
     /// <summary>The player's components, cached for the supplies.</summary>
@@ -39,7 +40,7 @@ public class WeaponInventory : MonoBehaviour
 
     SimpleFirstPersonController fp;
     float baseFov = 70f, raise = 1f, bobT, lastYaw, lastPitch;
-    Vector2 sway;                                                          // x yaw, y pitch of the gun against the view, degrees
+    Vector2 turnRate;                                                      // smoothed turning of the view, °/s: x yaw (right +), y pitch (down +)
     int pending = -1;
     bool triggerArmed, prevHeld, testActive, testTrigger, testAim;
     AudioSource[] voicePool; int nextVoice;
@@ -50,7 +51,8 @@ public class WeaponInventory : MonoBehaviour
     {
         Instance = this;
         fp = GetComponent<SimpleFirstPersonController>(); Health = GetComponent<PlayerHealth>();
-        lastYaw = transform.eulerAngles.y; lastPitch = fp != null ? fp.Pitch : 0f;   // no sway kick on the first frame
+        ResetSway();                                                       // no sway kick on the first frame
+        if (fp != null) fp.Teleported += ResetSway;                        // a teleport is not a turn
         baseFov = GameSettings.Fov;
         if (cam != null) cam.fieldOfView = baseFov;
         weapons = weapons == null ? new Weapon[0] : System.Array.FindAll(weapons, x => x != null);   // a missing reference must not break the rest
@@ -70,7 +72,11 @@ public class WeaponInventory : MonoBehaviour
         }
     }
 
-    void OnDestroy() { if (Instance == this) Instance = null; }
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+        if (fp != null) fp.Teleported -= ResetSway;
+    }
 
     /// <summary>Drives the trigger and the scope without a mouse (automated tests). ClearTestInput gives control back.</summary>
     public void SetTestInput(bool trigger, bool aim) { testActive = true; testTrigger = trigger; testAim = aim; }
@@ -100,7 +106,7 @@ public class WeaponInventory : MonoBehaviour
     void LateUpdate()
     {
         Vector2 turned = ViewTurned();                                     // measured every frame, so a cannon spell leaves no jump behind
-        var w = Current; if (w == null || Holstered) { sway = Vector2.zero; return; }
+        var w = Current; if (w == null || Holstered) { turnRate = Vector2.zero; return; }
         var game = WaveSurvivalGame.Instance;
         bool over = game != null && game.IsOver;
         bool held, aimHeld;
@@ -152,18 +158,16 @@ public class WeaponInventory : MonoBehaviour
         bobT += Time.deltaTime * speed * 1.35f;
         float k = Mathf.Clamp01(speed / 8.5f);
 
-        // sway: the gun trails the turning view a little and settles back when the view stops
+        // sway: the gun trails the turning view a little and settles back when the view stops. The turn rate is smoothed
+        // first and the result limited after, so a flick sways the gun the same at 30 and at 144 fps (a clamp before
+        // the smoothing would cut a one-frame flick harder the higher the frame rate)
         float dt = Time.deltaTime;
-        if (dt > 0f)
-        {
-            float perDegPerSec = swayAngle / 100f / dt;
-            Vector2 target = new Vector2(Mathf.Clamp(-turned.x * perDegPerSec, -swayMaxAngle, swayMaxAngle),
-                                         Mathf.Clamp(-turned.y * perDegPerSec, -swayMaxAngle, swayMaxAngle));
-            sway = Vector2.Lerp(sway, target, 1f - Mathf.Exp(-swaySmoothing * dt));
-        }
-        float shift = swayAngle > 0.0001f ? swayShift / swayAngle : 0f;
+        if (dt > 0f) turnRate = Vector2.Lerp(turnRate, turned / dt, 1f - Mathf.Exp(-Mathf.Max(0.5f, swaySmoothing) * dt));
+        float maxA = Mathf.Max(0f, swayMaxAngle), maxS = Mathf.Max(0f, swayMaxShift);
+        Vector2 tilt = new Vector2(Mathf.Clamp(-turnRate.x * swayAngle / 100f, -maxA, maxA), Mathf.Clamp(-turnRate.y * swayAngle / 100f, -maxA, maxA));
+        Vector2 slide = new Vector2(Mathf.Clamp(-turnRate.x * swayShift / 100f, -maxS, maxS), Mathf.Clamp(turnRate.y * swayShift / 100f, -maxS, maxS));
         w.UpdatePose(raise, Aim, new Vector3(Mathf.Cos(bobT) * 0.007f, -Mathf.Abs(Mathf.Sin(bobT)) * 0.009f, 0f) * k,
-                     new Vector3(sway.y, sway.x, sway.x * swayRoll), new Vector3(sway.x, -sway.y, 0f) * shift);
+                     new Vector3(tilt.y, tilt.x, tilt.x * swayRoll), new Vector3(slide.x, slide.y, 0f));
     }
 
     /// <summary>How far the view turned since the last frame, degrees: x yaw (right +), y pitch (down +).</summary>
@@ -175,11 +179,25 @@ public class WeaponInventory : MonoBehaviour
         return d;
     }
 
+    /// <summary>The current view becomes the sway's resting point (after a teleport or a scripted turn: no jolt of the gun).</summary>
+    public void ResetSway()
+    {
+        lastYaw = transform.eulerAngles.y; lastPitch = fp != null ? fp.Pitch : 0f;
+        turnRate = Vector2.zero;
+    }
+
+    /// <summary>Tests: the gun's current tilt against its resting pose, degrees (0 when the view has been still a while).</summary>
+    public float SwayAngleNow { get { return Current != null ? Current.SwayTiltNow : 0f; } }
+
     public void OnRoundFired(Weapon w, bool hit)
     {
         ShotsFired++;
         if (hit) { Hits++; LastHitTime = Time.time; }
-        if (fp != null) fp.AddRecoil(w.recoil * (1f - 0.5f * Aim));
+        if (fp != null)
+        {
+            fp.AddRecoil(w.recoil * (1f - 0.5f * Aim));
+            lastPitch = fp.Pitch;                                       // the kick is the weapon's own animation, not a turn to sway after
+        }
         if (voicePool != null && w.shotClips != null && w.shotClips.Length > 0)
         {
             var a = voicePool[nextVoice]; nextVoice = (nextVoice + 1) % voicePool.Length;

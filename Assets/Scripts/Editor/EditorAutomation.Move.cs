@@ -265,16 +265,19 @@ public static partial class EditorAutomation
             fp.Teleport(new Vector3(c.x, gy + 0.3f, c.z - 1f)); fp.transform.rotation = Quaternion.LookRotation(Fw);
             yield return Wait(0.4f);
             fp.SetTestInput(Vector3.forward, false, false);
-            float camJump = 0f, lastCam = fp.cameraPivot.position.y, stepped = 0f;
+            // the camera rises at a limited speed (m/s) instead of jumping with the step: measured as speed, so a slow frame
+            // (a longer move at the same speed) does not count as a jump
+            float camJump = 0f, lastCam = fp.cameraPivot.position.y, lastCamT = Time.time, stepped = 0f;
             yield return Run(0.9f, () =>
             {
-                float cy = fp.cameraPivot.position.y; camJump = Mathf.Max(camJump, Mathf.Abs(cy - lastCam)); lastCam = cy;
+                float cy = fp.cameraPivot.position.y, ct = Time.time;
+                if (ct > lastCamT + 1e-4f) { camJump = Mathf.Max(camJump, Mathf.Abs(cy - lastCam) / (ct - lastCamT)); lastCam = cy; lastCamT = ct; }
                 stepped += fp.Motor.LastStep;
             });
             Vector3 p = fp.transform.position;
             if (hgt < motor.stepHeight)
-                Check(Mathf.Abs(p.y - topY) < 0.03f && p.z > c.z + 2f && fp.IsGrounded && camJump < 0.08f,
-                      "step " + hgt + " m: on top " + F3(p.y - topY) + " m, stepped " + F3(stepped) + " m, largest camera move in a frame " + F3(camJump) + " m");
+                Check(Mathf.Abs(p.y - topY) < 0.03f && p.z > c.z + 2f && fp.IsGrounded && camJump < 6f,
+                      "step " + hgt + " m: on top " + F3(p.y - topY) + " m, stepped " + F3(stepped) + " m, fastest camera rise or fall " + F3(camJump) + " m/s (moving with the step: ~" + F3(hgt * 144f) + ")");
             else
                 Check(Mathf.Abs(p.y - gy) < 0.03f && p.z + rad <= c.z + 2f + 0.002f && p.z + rad > c.z + 2f - 0.05f && fp.IsGrounded,
                       "block " + hgt + " m: stopped " + F3(c.z + 2f - p.z - rad) + " m before it, feet at " + F3(p.y - gy) + " m");
@@ -350,6 +353,47 @@ public static partial class EditorAutomation
             float drift = Vector3.Distance(p0, fp.transform.position);
             Check(drift < 0.005f, "stand still 2 s on " + s.angle.ToString("0.0") + " deg at 30 fps: drift " + F3(drift) + " m");
             Application.targetFrameRate = savedFrameRate; QualitySettings.vSyncCount = savedVSync;
+        }
+        // ---- 11. weapon sway: trails a turning view within its limit, settles back, the same at 30 and 144 fps;
+        //          recoil and teleports do not swing it
+        var inv = fp.GetComponent<WeaponInventory>();
+        if (inv != null && inv.Current != null)
+        {
+            fp.ClearTestInput(); fp.Teleport(c + Vector3.up * 0.3f); fp.Pitch = 0f; inv.ResetSway();
+            float limit = Mathf.Sqrt(2f) * inv.swayMaxAngle * Mathf.Sqrt(1f + inv.swayRoll * inv.swayRoll) + 0.1f;   // yaw + roll (+ pitch)
+            var peaks = new float[2];
+            int[] rates = { 30, 144 };
+            for (int r = 0; r < 2; r++)
+            {
+                QualitySettings.vSyncCount = 0; Application.targetFrameRate = rates[r];
+                yield return Wait(0.8f);
+                float rest = inv.SwayAngleNow, peak = 0f, lastT = Time.time;
+                yield return Run(0.5f, () =>                               // turn right at 180 °/s
+                {
+                    float now = Time.time; fp.transform.Rotate(0f, 180f * (now - lastT), 0f); lastT = now;
+                    peak = Mathf.Max(peak, inv.SwayAngleNow);
+                });
+                yield return Wait(1.2f);
+                float settled = inv.SwayAngleNow;
+                peaks[r] = peak;
+                Check(rest < 0.05f && peak > 0.5f && peak <= limit && settled < 0.05f,
+                      "sway at " + rates[r] + " fps: turning 180 deg/s tilts the gun " + F3(peak) + " deg (limit " + F3(limit) + "), back to " + F3(settled) + " deg after 1.2 s");
+            }
+            Application.targetFrameRate = savedFrameRate; QualitySettings.vSyncCount = savedVSync;
+            Check(Mathf.Abs(peaks[0] - peaks[1]) <= Mathf.Max(peaks[0], peaks[1]) * 0.2f, "sway the same at 30 and 144 fps: " + F3(peaks[0]) + " / " + F3(peaks[1]) + " deg");
+
+            yield return Wait(0.6f);
+            fp.Teleport(c + Vector3.up * 0.3f + Vector3.right * 2f); fp.transform.Rotate(0f, 0f, 0f);
+            float afterTp = 0f;
+            yield return Run(0.3f, () => afterTp = Mathf.Max(afterTp, inv.SwayAngleNow));
+            Check(afterTp < 0.05f, "teleport: the gun does not jolt (" + F3(afterTp) + " deg)");
+
+            fp.Pitch = -60f; inv.ResetSway(); yield return Wait(0.5f);      // a burst into the sky: recoil lifts the view, the gun must not sway after it
+            inv.SetTestInput(true, false);
+            float recoilSway = 0f;
+            yield return Run(0.6f, () => recoilSway = Mathf.Max(recoilSway, inv.SwayAngleNow));
+            inv.ClearTestInput(); fp.Pitch = 0f; inv.ResetSway();
+            Check(recoilSway < 0.05f, "recoil (" + inv.Current.displayName + " burst) does not sway the gun: " + F3(recoilSway) + " deg");
         }
         fp.Teleport(c + Vector3.up * 0.3f);
     }
