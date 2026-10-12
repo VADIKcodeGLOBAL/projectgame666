@@ -10104,7 +10104,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 46
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -13313,7 +13313,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 52
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -17728,6 +17728,8 @@ MonoBehaviour:
   startDelay: 6
   maxAlive: 220
   botPrefab: {fileID: 7653853566838160665, guid: a88fb3e706be5d546b08275251522af3, type: 3}
+  characterBots:
+  - {fileID: 382528487858628318, guid: 65f0219e8b3b0544fb7abf4d754cbb4a, type: 3}
   spawnRadius: 250
   baseHealth: 40
   healthPerWave: 0.2
@@ -26240,7 +26242,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 64
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1

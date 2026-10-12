@@ -323,7 +323,7 @@ public static partial class EditorAutomation
         fp.ClearTestInput(); Object.Destroy(roof); yield return Wait(0.1f); Physics.SyncTransforms();
 
         // ---- 8. a bot in the way is not walked through
-        var bot = Object.Instantiate(game.botPrefab, new Vector3(c.x, gy + 0.05f, c.z + 3f), Quaternion.LookRotation(-Fw));
+        var bot = Object.Instantiate(game.EnemyPrefab, new Vector3(c.x, gy + 0.05f, c.z + 3f), Quaternion.LookRotation(-Fw));
         bot.Init(fp.transform, 1e7f, 0f, 0f, 1f, Color.white); moveTemp.Add(bot.gameObject);
         fp.Teleport(new Vector3(c.x + 0.1f, gy + 0.3f, c.z - 1f)); fp.transform.rotation = Quaternion.LookRotation(Fw);
         yield return Wait(0.5f);

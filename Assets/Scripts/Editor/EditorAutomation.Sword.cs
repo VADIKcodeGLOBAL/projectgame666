@@ -66,7 +66,7 @@ public static partial class EditorAutomation
         var bots = new List<EnemyBot>();
         Func<Vector3, float, EnemyBot> spawn = (offset, hp) =>
         {
-            var b = Object.Instantiate(game.botPrefab, onGround(c + offset) + Vector3.up * 0.05f, Quaternion.LookRotation(-offset.normalized + Vector3.forward * 0.001f));
+            var b = Object.Instantiate(game.EnemyPrefab, onGround(c + offset) + Vector3.up * 0.05f, Quaternion.LookRotation(-offset.normalized + Vector3.forward * 0.001f));
             b.Init(fp.transform, hp, 0f, 0f, 1f, Color.white); moveTemp.Add(b.gameObject); bots.Add(b);
             return b;
         };

@@ -209,8 +209,9 @@ public class MeleeWeapon : HandWeapon
         for (int i = 0; i < EnemyBot.All.Count; i++)
         {
             var bot = EnemyBot.All[i];
-            if (bot.IsDying || bot.body == null || hitThisSwing.Contains(bot)) continue;
-            Vector3 near = bot.body.bounds.ClosestPoint(eye.position), centre = bot.body.bounds.center;
+            if (bot.IsDying || bot.HitBox == null || hitThisSwing.Contains(bot)) continue;
+            Bounds bb = bot.BodyBounds;
+            Vector3 near = bb.ClosestPoint(eye.position), centre = bb.center;
             float dist = Vector3.Distance(eye.position, near);
             if (dist > reach) continue;
             Vector3 local = eye.InverseTransformDirection(centre - eye.position);

@@ -313,7 +313,7 @@ public class CannonballSystem : MonoBehaviour
         {
             var bot = EnemyBot.All[i];
             if (bot.IsDying) continue;
-            Vector3 c = bot.body != null ? bot.body.transform.position : bot.transform.position;
+            Vector3 c = bot.HitBox != null ? bot.BodyBounds.center : bot.transform.position;
             float d = Vector3.Distance(at, c);
             if (d > radius) continue;
             bot.TakeDamage(damage * Mathf.Lerp(1f, edgeDamage, d / radius));

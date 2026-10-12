@@ -23,7 +23,9 @@ public class WaveSurvivalGame : MonoBehaviour
     [Tooltip("No new bots while this many are alive (performance guard).")] public int maxAlive = 220;
 
     [Header("Bots")]
-    public EnemyBot botPrefab;
+    [Tooltip("The box bot: the enemy when there are no characters (the models are not in the repository).")] public EnemyBot botPrefab;
+    [Tooltip("Animated character enemies (Assets/Art/Characters/Gmod/_Enemies, made by the \"enemies\" command); one is picked per bot.")]
+    public EnemyBot[] characterBots = new EnemyBot[0];
     [Tooltip("Distance from the hill at which bots appear (up on the boundary ridge).")] public float spawnRadius = 250f;
     public float baseHealth = 40f, healthPerWave = 0.2f;
     public float baseSpeed = 7.5f, speedPerWave = 0.35f;
@@ -71,6 +73,8 @@ public class WaveSurvivalGame : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        // a slow frame must not be followed by a pile of physics steps (each one slower than the frame they catch up with)
+        Time.maximumDeltaTime = 0.1f;
         if (GetComponent<UpgradeSystem>() == null) gameObject.AddComponent<UpgradeSystem>();   // the upgrades between the waves
         State = GameState.Prepare; TimeLeft = startDelay; Wave = 0;
         if (player != null) health = player.GetComponent<PlayerHealth>();
@@ -129,16 +133,31 @@ public class WaveSurvivalGame : MonoBehaviour
         batchAngle = Random.Range(0f, 360f);                           // each batch arrives from three directions
     }
 
+    /// <summary>The enemy to spawn: one of the characters if there are any, the box bot otherwise.</summary>
+    public EnemyBot EnemyPrefab
+    {
+        get
+        {
+            int n = 0;
+            if (characterBots != null) foreach (var c in characterBots) if (c != null) n++;
+            if (n == 0) return botPrefab;
+            int pick = Random.Range(0, n);
+            foreach (var c in characterBots) if (c != null && pick-- == 0) return c;
+            return botPrefab;
+        }
+    }
+
     void SpawnBot()
     {
-        if (botPrefab == null) return;
+        var prefab = EnemyPrefab;
+        if (prefab == null) return;
         float a = (batchAngle + (Spawned % 3) * 120f + Random.Range(-28f, 28f)) * Mathf.Deg2Rad;
         Vector3 centre = zone != null ? zone.transform.position : Vector3.zero;
         Vector3 p = centre + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (spawnRadius + Random.Range(-10f, 8f));
         p.x = Mathf.Clamp(p.x, -mapHalfSize, mapHalfSize); p.z = Mathf.Clamp(p.z, -mapHalfSize, mapHalfSize);
         var t = Terrain.activeTerrain;
         p.y = (t != null ? t.SampleHeight(p) + t.transform.position.y : centre.y) + 0.2f;
-        var bot = Instantiate(botPrefab, p, Quaternion.LookRotation(new Vector3(centre.x - p.x, 0f, centre.z - p.z)));
+        var bot = Instantiate(prefab, p, Quaternion.LookRotation(new Vector3(centre.x - p.x, 0f, centre.z - p.z)));
         int w = Mathf.Max(1, Wave) - 1;
         Color c = waveColors != null && waveColors.Length > 0 ? waveColors[Mathf.Min(w, waveColors.Length - 1)] : Color.red;
         bot.Init(player, baseHealth * (1f + healthPerWave * w), baseSpeed + speedPerWave * w, baseDamage + damagePerWave * w, 1f + 0.08f * w, c * 1.6f);

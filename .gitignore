@@ -27,3 +27,7 @@ crashlytics-build.properties
 
 # drop folder for incoming files (originals are copied to Source/ when used)
 /from me/
+
+# Gmod playermodels copied from D:\Gmod\unarchive-models (local only, ~0.8 GB; import settings: Scripts/Editor/GmodModelImport.cs)
+/Assets/Art/Characters/Gmod/
+/Assets/Art/Characters/Gmod.meta

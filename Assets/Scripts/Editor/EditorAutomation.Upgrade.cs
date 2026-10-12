@@ -105,7 +105,7 @@ public static partial class EditorAutomation
         var bots = new List<EnemyBot>();
         Func<Vector3, float, float, EnemyBot> spawn = (offset, health, speed) =>
         {
-            var b = Object.Instantiate(game.botPrefab, onGround(c + offset) + Vector3.up * 0.05f, Quaternion.LookRotation(-offset.normalized + Vector3.forward * 0.001f));
+            var b = Object.Instantiate(game.EnemyPrefab, onGround(c + offset) + Vector3.up * 0.05f, Quaternion.LookRotation(-offset.normalized + Vector3.forward * 0.001f));
             b.Init(fp.transform, health, speed, 0f, 1f, Color.white); moveTemp.Add(b.gameObject); bots.Add(b);
             return b;
         };
@@ -222,7 +222,7 @@ public static partial class EditorAutomation
     /// <summary>Turns the view on the bot's body and fires one round of the gun in hand.</summary>
     static IEnumerator ShootOnce(SimpleFirstPersonController fp, WeaponInventory inv, EnemyBot target, string shot = null)
     {
-        Vector3 eye = fp.cameraPivot.position, aim = target.body.bounds.center, d = aim - eye;
+        Vector3 eye = fp.cameraPivot.position, aim = target.BodyBounds.center, d = aim - eye;
         fp.transform.rotation = Quaternion.LookRotation(new Vector3(d.x, 0f, d.z)); inv.ResetSway();
         fp.Pitch = -Mathf.Asin(d.y / d.magnitude) * Mathf.Rad2Deg;
         if (inv.CurrentGun != null) inv.CurrentGun.FillMagazine();

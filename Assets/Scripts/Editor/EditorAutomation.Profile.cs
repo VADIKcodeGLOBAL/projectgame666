@@ -18,7 +18,7 @@ public static partial class EditorAutomation
     {
         var game = WaveSurvivalGame.Instance;
         var fp = Object.FindFirstObjectByType<SimpleFirstPersonController>();
-        if (game == null || fp == null || game.botPrefab == null) throw new Exception("game, player or bot prefab missing");
+        if (game == null || fp == null || game.EnemyPrefab == null) throw new Exception("game, player or bot prefab missing");
         var inv = fp.GetComponent<WeaponInventory>();
         var terrain = Terrain.activeTerrain;
         Vector3 c = game.zone.transform.position;
@@ -32,7 +32,7 @@ public static partial class EditorAutomation
                 float a = i * 137.508f * Mathf.Deg2Rad, r = near + (i % 31) / 30f * span;
                 Vector3 p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * r;
                 if (terrain != null) p.y = terrain.SampleHeight(p) + terrain.transform.position.y + 0.2f;
-                var b = Object.Instantiate(game.botPrefab, p, Quaternion.LookRotation(new Vector3(c.x - p.x, 0f, c.z - p.z)));
+                var b = Object.Instantiate(game.EnemyPrefab, p, Quaternion.LookRotation(new Vector3(c.x - p.x, 0f, c.z - p.z)));
                 b.Init(fp.transform, 40f, 7.5f, 4f, 1f, new Color(1.6f, 0.9f, 0.2f)); moveTemp.Add(b.gameObject);
             }
         };

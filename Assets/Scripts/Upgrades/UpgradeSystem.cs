@@ -271,27 +271,27 @@ public class UpgradeSystem : MonoBehaviour
             for (int i = 0; i < EnemyBot.All.Count; i++)
             {
                 var b = EnemyBot.All[i];
-                if (b == bot || b.IsDying || b.body == null) continue;
-                if ((b.body.bounds.ClosestPoint(point) - point).sqrMagnitude <= r2) b.TakeDamage(damage * st.burstShare);
+                if (b == bot || b.IsDying || b.HitBox == null) continue;
+                if ((b.BodyBounds.ClosestPoint(point) - point).sqrMagnitude <= r2) b.TakeDamage(damage * st.burstShare);
             }
             if (s != null) s.Burst(point, st.burstRadius);
         }
         if (st.chainTargets > 0)
         {
             struck.Clear(); struck.Add(bot);
-            Vector3 from = bot.body != null ? bot.body.bounds.center : point;
+            Vector3 from = bot.HitBox != null ? bot.BodyBounds.center : point;
             for (int n = 0; n < st.chainTargets; n++)
             {
                 EnemyBot next = null; float best = st.chainRange * st.chainRange;
                 for (int i = 0; i < EnemyBot.All.Count; i++)
                 {
                     var b = EnemyBot.All[i];
-                    if (b.IsDying || b.body == null || struck.Contains(b)) continue;
-                    float d2 = (b.body.bounds.center - from).sqrMagnitude;
+                    if (b.IsDying || b.HitBox == null || struck.Contains(b)) continue;
+                    float d2 = (b.BodyBounds.center - from).sqrMagnitude;
                     if (d2 < best) { best = d2; next = b; }
                 }
                 if (next == null) break;
-                Vector3 to = next.body.bounds.center;
+                Vector3 to = next.BodyBounds.center;
                 if (s != null) s.Arc(from, to);
                 struck.Add(next); next.TakeDamage(damage * st.chainShare);
                 from = to;

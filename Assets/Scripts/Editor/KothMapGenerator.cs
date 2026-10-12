@@ -115,13 +115,13 @@ public static class KothMapGenerator
         return st;
     }
 
-    static void EnsureFolder(string path)
+    internal static void EnsureFolder(string path)
     {
         if (AssetDatabase.IsValidFolder(path)) return;
         Directory.CreateDirectory(path); AssetDatabase.Refresh();
     }
 
-    static T GetAsset<T>(string path, Func<T> create) where T : UnityEngine.Object
+    internal static T GetAsset<T>(string path, Func<T> create) where T : UnityEngine.Object
     {
         var a = AssetDatabase.LoadAssetAtPath<T>(path);
         if (a == null) { a = create(); AssetDatabase.CreateAsset(a, path); }
@@ -1057,7 +1057,7 @@ public static class KothMapGenerator
         return ZoneMesh("Zone_Wall", R, top, new[] { R, R }, new[] { -0.3f, ZoneWallHeight }, new[] { -0.3f, ZoneWallHeight }, true);
     }
 
-    static EnemyBot MakeBotPrefab()
+    internal static EnemyBot MakeBotPrefab()
     {
         EnsureFolder("Assets/Prefabs/Enemies");
         var sh = Shader.Find("ProjectGame/EnemyGlow");
@@ -1143,6 +1143,7 @@ public static class KothMapGenerator
         var game = gameGo.AddComponent<WaveSurvivalGame>();
         game.waves = s.waves; game.waveDuration = s.waveDuration; game.batchInterval = s.batchInterval; game.mobsPerBatch = s.mobsPerBatch;
         game.zone = zone; game.player = player.transform; game.botPrefab = MakeBotPrefab();
+        game.characterBots = EnemyPrefabs.BuildAll().ToArray();                  // animated characters if the models are here, else the box
         game.spawnRadius = Mathf.Min(s.playRadius + 15f, half - 14f); game.mapHalfSize = half - 8f;
         var hud = gameGo.AddComponent<SurvivalHud>(); hud.game = game; hud.health = health; hud.weapons = weapons;
         HudSetup.Build(hud);                                                      // the HUD canvas, visible in the editor
@@ -1242,11 +1243,11 @@ public static class KothMapGenerator
         {
             Vector3 top = zone.transform.position;
             Vector3 fwd = Quaternion.Euler(0f, 35f, 0f) * Vector3.forward;
-            if (game != null && game.botPrefab != null)               // a few bots in front of the summit camera, to see them in every light
+            if (game != null && game.EnemyPrefab != null)               // a few bots in front of the summit camera, to see them in every light
                 for (int k = 0; k < 5; k++)
                 {
                     Vector3 p = top + Quaternion.Euler(0f, 35f + (k - 2) * 14f, 0f) * Vector3.forward * (9f + k * 2.5f);
-                    var b = UnityEngine.Object.Instantiate(game.botPrefab.gameObject, at(p.x, p.z, 0f), Quaternion.LookRotation(-fwd));
+                    var b = UnityEngine.Object.Instantiate(game.EnemyPrefab.gameObject, at(p.x, p.z, 0f), Quaternion.LookRotation(-fwd));
                     b.hideFlags = HideFlags.HideAndDontSave; temp.Add(b);
                 }
             var times = new[] { new KeyValuePair<string, float>("day", 0.40f), new KeyValuePair<string, float>("dusk", 0.742f), new KeyValuePair<string, float>("night", 0.96f) };

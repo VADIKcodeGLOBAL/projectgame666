@@ -48,7 +48,7 @@ public static partial class EditorAutomation
         {
             bool inside = i < 3;
             Vector3 p = onGround(target + Quaternion.Euler(0f, i * 72f, 0f) * Vector3.forward * (inside ? 2.5f : 11f)) + Vector3.up * 0.05f;
-            var b = Object.Instantiate(game.botPrefab, p, Quaternion.identity);
+            var b = Object.Instantiate(game.EnemyPrefab, p, Quaternion.identity);
             b.Init(fp.transform, 60f, 0f, 0f, 1f, Color.white);
             (inside ? near : far).Add(b); moveTemp.Add(b.gameObject);
         }

@@ -2,8 +2,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Box bot: walks over the terrain straight at the player, keeps a little distance from its neighbours,
+/// Enemy bot: walks over the terrain straight at the player, keeps a little distance from its neighbours,
 /// sidesteps when it gets stuck on a rock or a tree, and hits the player at arm's length.
+/// Two looks: the glowing box (body), or an animated character (character: its CharacterAnimator is stepped with the bot's
+/// own time step, plays the blow, the hits, the stagger and death — it lies there a moment, then sinks into the ground).
+/// Bullets test the hit box (a cube's transform: the box itself, or a box riding on the character's hips).
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class EnemyBot : MonoBehaviour
@@ -13,7 +16,13 @@ public class EnemyBot : MonoBehaviour
     public float damage = 8f;
     public float attackInterval = 1.0f;
     public float attackRange = 1.9f;
-    public Renderer body;
+    [Tooltip("The glowing box of the box bot (none on a character).")] public Renderer body;
+    [Tooltip("What bullets hit: a transform whose unit cube is the body (the box's own when empty).")] public Transform hitBox;
+    [Tooltip("The character's animation (none on the box bot).")] public CharacterAnimator character;
+    [Tooltip("The character's renderers, lit up for a moment by a hit.")] public Renderer[] flashRenderers;
+    [Tooltip("A dead character lies this long before it sinks into the ground, s.")] public float deathLinger = 2.2f;
+
+    const float SinkTime = 0.9f, SinkDepth = 1.4f;
 
     public float Health { get; private set; }
     public bool IsDying { get; private set; }
@@ -79,11 +88,28 @@ public class EnemyBot : MonoBehaviour
     }
 
     /// <summary>Whether the ray (unit dir) crosses this bot's body box closer than maxDist; t = the distance to it.</summary>
+    /// <summary>The transform whose unit cube is what bullets hit.</summary>
+    public Transform HitBox { get { return hitBox != null ? hitBox : body != null ? body.transform : null; } }
+
+    /// <summary>World box around the body (blades, blasts and arcs measure to it): the box's renderer, or the hit box's cube.</summary>
+    public Bounds BodyBounds
+    {
+        get
+        {
+            if (body != null) return body.bounds;
+            var hb = hitBox;
+            if (hb == null) return new Bounds(transform.position + Vector3.up, Vector3.one);
+            Vector3 x = hb.TransformVector(0.5f, 0f, 0f), y = hb.TransformVector(0f, 0.5f, 0f), z = hb.TransformVector(0f, 0f, 0.5f);
+            var half = new Vector3(Mathf.Abs(x.x) + Mathf.Abs(y.x) + Mathf.Abs(z.x), Mathf.Abs(x.y) + Mathf.Abs(y.y) + Mathf.Abs(z.y), Mathf.Abs(x.z) + Mathf.Abs(y.z) + Mathf.Abs(z.z));
+            return new Bounds(hb.position, half * 2f);
+        }
+    }
+
     public bool RayHitsBody(Vector3 origin, Vector3 dir, float maxDist, out float t)
     {
         t = 0f;
-        if (IsDying || body == null) return false;
-        Transform bt = body.transform;
+        Transform bt = HitBox;
+        if (IsDying || bt == null) return false;
         Vector3 v = bt.position - origin;
         float along = Vector3.Dot(v, dir), r = 0.5f * bt.lossyScale.magnitude;      // bounding sphere first: most bots are far off the line
         if (along < -r || along > maxDist + r || v.sqrMagnitude - along * along > r * r) return false;
@@ -112,14 +138,30 @@ public class EnemyBot : MonoBehaviour
         transform.localScale = Vector3.one * size; baseScale = transform.localScale;
         lastPos = transform.position; stuckCheck = Time.time + 1f; sideSign = Random.value < 0.5f ? -1f : 1f;
         lodSlot = Random.Range(0, 6); pendingDt = 0f;                  // spread the far bots over the frames they skip
+        if (character != null) character.Init(new System.Random(Random.Range(0, int.MaxValue)), size);
         ApplyLook();
     }
 
+    static readonly int ColorId = Shader.PropertyToID("_Color");
+
     void ApplyLook()
     {
-        if (body == null) return;
         if (block == null) block = new MaterialPropertyBlock();
-        body.GetPropertyBlock(block); block.SetColor(EmissionId, glow); block.SetFloat(FlashId, flash); body.SetPropertyBlock(block);
+        if (body != null) { body.GetPropertyBlock(block); block.SetColor(EmissionId, glow); block.SetFloat(FlashId, flash); body.SetPropertyBlock(block); }
+        if (flashRenderers == null) return;
+        // a character lights up: each material's own colour brightened (per material, so the tints stay their own)
+        foreach (var r in flashRenderers)
+        {
+            if (r == null) continue;
+            var mats = r.sharedMaterials;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                if (mats[i] == null || !mats[i].HasProperty(ColorId)) continue;
+                block.Clear();
+                if (flash > 0f) block.SetColor(ColorId, mats[i].color * (1f + 2.2f * flash));       // an empty block takes the override off
+                r.SetPropertyBlock(block, i);
+            }
+        }
     }
 
     public void TakeDamage(float amount)
@@ -127,6 +169,7 @@ public class EnemyBot : MonoBehaviour
         if (IsDying || !(amount > 0f)) return;                          // no healing through negative or NaN damage
         Health -= amount; flash = 1f; ApplyLook();
         if (Health <= 0f) Die(true);
+        else if (character != null) character.Hit();
     }
 
     const float KnockDeceleration = 14f;
@@ -145,13 +188,15 @@ public class EnemyBot : MonoBehaviour
         float until = Time.time + Mathf.Max(stagger, velocity.magnitude / KnockDeceleration);
         if (until > staggerUntil) staggerUntil = until;
         if (nextAttack < staggerUntil) nextAttack = staggerUntil;
+        if (character != null) character.Stagger();
     }
 
     public void Die(bool killedByPlayer)
     {
         if (IsDying) return;
-        IsDying = true; dieTime = Time.time;
+        IsDying = true; dieTime = Time.time; pendingDt = 0f;
         if (cc != null) cc.enabled = false;
+        if (character != null) character.Die();
         if (killedByPlayer && WaveSurvivalGame.Instance != null) WaveSurvivalGame.Instance.OnBotKilled(this);
     }
 
@@ -206,6 +251,7 @@ public class EnemyBot : MonoBehaviour
         if (flash > 0f) { flash = Mathf.MoveTowards(flash, 0f, dt * 7f); ApplyLook(); }
         if (IsDying)
         {
+            if (character != null) { DieAnimated(dt); return; }
             float k = 1f - (Time.time - dieTime) / 0.18f;
             if (k <= 0f) { Destroy(gameObject); return; }
             transform.localScale = new Vector3(baseScale.x * (1.4f - 0.4f * k), baseScale.y * k, baseScale.z * (1.4f - 0.4f * k));
@@ -222,6 +268,33 @@ public class EnemyBot : MonoBehaviour
         if (every > 1 && (Time.frameCount + lodSlot) % every != 0) return;
         dt = Mathf.Min(pendingDt, every == 1 ? 0.1f : 0.25f); pendingDt = 0f;
 
+        Move(dt, pos, to, dist);
+        if (character != null) Animate(dt, pos);
+        if (pos.y < -60f) Destroy(gameObject);
+    }
+
+    /// <summary>The animation follows what the body did this step: its speed over the ground, and climbing when it rose
+    /// more steeply than ~42 degrees.</summary>
+    void Animate(float dt, Vector3 from)
+    {
+        Vector3 d = transform.position - from;
+        float rise = d.y / dt; d.y = 0f;
+        float ground = d.magnitude / dt;
+        character.Step(dt, ground, rise > 1f && rise > ground * 0.9f);
+    }
+
+    /// <summary>A dead character plays its fall, lies a moment, then sinks into the ground and is gone.</summary>
+    void DieAnimated(float dt)
+    {
+        character.Step(dt, 0f, false);
+        float t = Time.time - dieTime - deathLinger;
+        if (t <= 0f) return;
+        transform.position += Vector3.down * (SinkDepth / SinkTime) * dt;
+        if (t >= SinkTime) Destroy(gameObject);
+    }
+
+    void Move(float dt, Vector3 pos, Vector3 to, float dist)
+    {
         if (knock.sqrMagnitude > 1e-4f)                                 // thrown back by a blow: slides, decelerating
         {
             vy = cc.isGrounded ? -2f : vy - 25f * dt;
@@ -236,6 +309,7 @@ public class EnemyBot : MonoBehaviour
             if (Time.time >= nextAttack && targetHealth != null && !targetHealth.IsDead && Mathf.Abs(target.position.y - pos.y) < 2.5f)
             {
                 nextAttack = Time.time + attackInterval; targetHealth.TakeDamage(damage);
+                if (character != null) character.Attack();
             }
         }
         else
@@ -257,6 +331,5 @@ public class EnemyBot : MonoBehaviour
                 lastPos = transform.position; stuckCheck = Time.time + 1f;
             }
         }
-        if (pos.y < -60f) Destroy(gameObject);
     }
 }

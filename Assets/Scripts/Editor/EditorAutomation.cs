@@ -71,6 +71,7 @@ public static partial class EditorAutomation
         if (mode == "smoketest") { SuiteTick(SmokeTests, "SMOKETEST"); return; }
         if (mode == "upgradetest") { SuiteTick(UpgradeTests, "UPGRADETEST"); return; }
         if (mode == "profile") { SuiteTick(ProfileRun, "PROFILE"); return; }
+        if (mode == "animtest") { SuiteTick(AnimTests, "ANIMTEST"); return; }
         float t = Time.timeSinceLevelLoad;
         if (t < 1.5f) return;
         var game = WaveSurvivalGame.Instance;
@@ -156,9 +157,9 @@ public static partial class EditorAutomation
             case 11:                                                       // weapons: the visible box is the hitbox, the rate of fire holds
             {
                 var inv = fp.GetComponent<WeaponInventory>();
-                EnemyBot tb = null; foreach (var b in EnemyBot.All) if (!b.IsDying && b.body != null) { tb = b; break; }
+                EnemyBot tb = null; foreach (var b in EnemyBot.All) if (!b.IsDying && b.HitBox != null) { tb = b; break; }
                 if (inv == null || inv.weapons.Length < 4 || tb == null) { Log("PLAYTEST_FAILED: no weapons or no bot for the weapon test"); playPhase = 9; playT = t; break; }
-                var bt = tb.body.transform; Vector3 fwd = bt.forward;
+                var bt = tb.HitBox; Vector3 fwd = bt.forward;
                 Vector3 corner = bt.TransformPoint(new Vector3(0.45f, 0.45f, 0f)) - fwd * 12f, beside = bt.TransformPoint(new Vector3(0.56f, 0.45f, 0f)) - fwd * 12f;
                 float d1 = 600f, d2 = 600f;
                 // this bot only: with 20 bots around, another one can stand on the same line
@@ -263,7 +264,7 @@ public static partial class EditorAutomation
                 inv.ClearTestInput(); fp.Pitch = 0f;
                 // a target bot that stands still 14 m ahead, for hits while standing, sprinting backwards and walking backwards
                 Teleport(fp, c - runDir * 2f); fp.transform.rotation = Quaternion.LookRotation(runDir);
-                var tgt = UnityEngine.Object.Instantiate(game.botPrefab, c + runDir * 12f, Quaternion.LookRotation(-runDir));
+                var tgt = UnityEngine.Object.Instantiate(game.EnemyPrefab, c + runDir * 12f, Quaternion.LookRotation(-runDir));
                 tgt.Init(fp.transform, 1e7f, 0f, 0f, 1f, Color.white); tgt.name = "TestTarget";
                 moveIdx = 0; landT = -1f; playPhase = 20; playT = t; break;
             }
@@ -272,7 +273,7 @@ public static partial class EditorAutomation
                 var inv = fp.GetComponent<WeaponInventory>();
                 var tgt = GameObject.Find("TestTarget"); EnemyBot tb = tgt != null ? tgt.GetComponent<EnemyBot>() : null;
                 if (tb == null) { Log("PLAYTEST_FAILED: test target lost"); playPhase = 9; playT = t; break; }
-                Vector3 d = tb.body.transform.position - inv.cam.transform.position;
+                Vector3 d = tb.BodyBounds.center - inv.cam.transform.position;
                 fp.transform.rotation = Quaternion.LookRotation(new Vector3(d.x, 0f, d.z));
                 fp.Pitch = -Mathf.Asin(d.y / d.magnitude) * Mathf.Rad2Deg;
                 if (t < playT + 0.3f) break;                               // settle, then measure
@@ -503,6 +504,13 @@ public static partial class EditorAutomation
             else if (cmd == "cannon") CannonSetup.InstallInOpenScene();
             else if (cmd == "cannon-view") CannonSetup.ViewShots();
             else if (cmd == "zone") KothMapGenerator.RebuildZoneInOpenScene();
+            else if (cmd == "gmod-check") GmodModelImport.Check();
+            else if (cmd == "chars") CharacterRigSetup.SetUpAll();
+            else if (cmd == "anims") AnimationLibraryBuilder.Build();
+            else if (cmd == "enemies") EnemyPrefabs.InstallInOpenScene();
+            else if (cmd == "animtest") { moveTestRunner = null; ArmPlaytest("animtest"); }
+            else if (cmd.StartsWith("anim-probe ")) AnimationLibraryBuilder.Probe(cmd.Substring(11).Trim());
+            else if (cmd.StartsWith("gmod-mats ")) GmodModelImport.DumpMaterials(cmd.Substring(10).Trim());
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");
         }
