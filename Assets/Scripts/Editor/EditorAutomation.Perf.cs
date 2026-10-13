@@ -1,5 +1,6 @@
 using Unity.Profiling;
 using UnityEditor;
+using System.Linq;
 using UnityEngine;
 
 public static partial class EditorAutomation
@@ -32,6 +33,14 @@ public static partial class EditorAutomation
     /// script time (Update, LateUpdate, OnGUI) and garbage per frame are averaged from the profiler counters.
     /// Editor numbers: compare runs with each other, not with a build.
     /// </summary>
+    /// <summary>The worst case for the perf scenes: every model of the roster in turn (all tiers, NSFW too: the most meshes,
+    /// materials and textures at once), else the level's enemy.</summary>
+    static EnemyBot AnyEnemy(WaveSurvivalGame game, int i)
+    {
+        var all = game.roster != null ? game.roster.enemies.Where(e => e != null && e.prefab != null && e.enabled).ToList() : null;
+        return all != null && all.Count > 0 ? all[i % all.Count].prefab : game.EnemyPrefab;
+    }
+
     static void PerfTick()
     {
         float t = Time.timeSinceLevelLoad;
@@ -52,10 +61,10 @@ public static partial class EditorAutomation
                     float a = i * 137.508f * Mathf.Deg2Rad, r = 45f + (i % 31) * 1f;
                     Vector3 p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * r;
                     if (terrain != null) p.y = terrain.SampleHeight(p) + terrain.transform.position.y + 0.2f;
-                    var b = Object.Instantiate(game.EnemyPrefab, p, Quaternion.LookRotation(new Vector3(c.x - p.x, 0f, c.z - p.z)));
+                    var b = Object.Instantiate(AnyEnemy(game, i), p, Quaternion.LookRotation(new Vector3(c.x - p.x, 0f, c.z - p.z)));
                     b.Init(fp.transform, 40f, 7.5f, 4f, 1f, new Color(1.6f, 0.9f, 0.2f));
                 }
-                Log("  perftest: " + EnemyBot.All.Count + " bots alive");
+                Log("  perftest: " + EnemyBot.All.Count + " bots alive (" + EnemyBot.All.Select(x => x.model).Where(m => !string.IsNullOrEmpty(m)).Distinct().Count() + " models)");
                 perfPhase = 1; perfT = t; break;
             }
             case 1:

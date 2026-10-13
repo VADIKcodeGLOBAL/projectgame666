@@ -17728,8 +17728,7 @@ MonoBehaviour:
   startDelay: 6
   maxAlive: 220
   botPrefab: {fileID: 7653853566838160665, guid: a88fb3e706be5d546b08275251522af3, type: 3}
-  characterBots:
-  - {fileID: 382528487858628318, guid: 65f0219e8b3b0544fb7abf4d754cbb4a, type: 3}
+  roster: {fileID: 11400000, guid: 56eacb6b82014444da1843c5a368b862, type: 2}
   spawnRadius: 250
   baseHealth: 40
   healthPerWave: 0.2

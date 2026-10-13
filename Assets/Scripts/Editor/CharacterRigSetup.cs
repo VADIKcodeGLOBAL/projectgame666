@@ -2,33 +2,114 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
 /// Humanoid avatars of the characters that become enemies (automation "chars", Tools > Characters > Set Up Rigs).
-/// Each entry of <see cref="Characters"/> is a source FBX outside the project (still being worked on: copied in again whenever the
-/// source is newer) and its place in the project. Its ValveBiped bones are mapped onto Unity's human bones, and the avatar's
-/// reference pose is a T-pose (arms raised to the horizontal, legs straight down, whatever the rest pose is): clips from any
-/// humanoid source then retarget onto it the same way. The mesh is not changed.
-/// Check renders: Logs/shots/chars_&lt;name&gt;_pose.png (rest pose | avatar T-pose) and _human.png (muscles at zero | a test pose).
+/// The characters are the SFW and NSFW variants exported by the Blender conversion: every
+/// D:\Gmod\unarchive-models\&lt;model&gt;\export\&lt;qc&gt;\&lt;qc&gt;_&lt;outfit&gt;_(n)sfw[_skinNN].fbx, kept in the project as
+/// Assets/Art/Characters/Gmod/&lt;model&gt;/&lt;qc&gt;/ (local: the folder is git-ignored). They are still being worked on: a variant
+/// (and its textures) is copied in again whenever the source is newer. Without the source folder the project's copies are used.
+/// Each variant's ValveBiped bones are mapped onto Unity's human bones, and the avatar's reference pose is a T-pose (arms
+/// raised to the horizontal, legs straight down, whatever the rest pose is): clips from any humanoid source then retarget onto
+/// it the same way. The mesh is not changed. A variant already set up (same rig version, nothing copied) is left alone.
+/// Check renders of each model's first variant: Logs/shots/chars_&lt;qc&gt;_pose.png (rest pose | avatar T-pose) and _human.png
+/// (muscles at zero | a test pose).
 /// </summary>
 public static class CharacterRigSetup
 {
-    /// <summary>A character: its source FBX, its copy in the project, and the source QC with its $jigglebone settings.</summary>
-    public class Character { public string name, source, asset, qc; }
+    public const string SourceRoot = @"D:\Gmod\unarchive-models";
+    /// <summary>Stamped into a set-up model's import settings (userData): a newer version sets every model up again.</summary>
+    const string RigVersion = "rig-v2";
+    /// <summary>The character the clip speeds are measured on and the animation sheets are drawn with (any if it is missing).</summary>
+    const string ReferenceName = "kroxigorpm_jeans_sfw";
 
-    public static readonly Character[] Characters =
+    /// <summary>A character variant: its source FBX, its copy in the project, the model (top folder) and qc (avatar group) it
+    /// belongs to, the source QC with its $jigglebone settings, and whether it is an NSFW variant.</summary>
+    public class Character { public string name, model, group, source, asset, qc; public bool nsfw; }
+
+    static readonly Regex VariantName = new Regex(@"_(n?sfw)(_|$)", RegexOptions.IgnoreCase);
+    static readonly Regex LodName = new Regex(@"_LOD\d+$", RegexOptions.IgnoreCase);
+
+    /// <summary>Whether a file name (without extension) is an SFW / NSFW variant (not a LOD mesh, not an export of something else).</summary>
+    public static bool IsVariant(string stem) { return VariantName.IsMatch(stem) && !LodName.IsMatch(stem); }
+
+    /// <summary>Every variant, from the source folder and the project (sorted: model, qc, SFW first, name).</summary>
+    public static List<Character> Characters
     {
-        new Character
+        get
         {
-            name = "Kroxigor",
-            source = @"D:\Gmod\unarchive-models\kroxigor\export\kroxigorpm\kroxigorpm-my-export.fbx",
-            asset = GmodModelImport.Root + "/kroxigor/kroxigorpm/kroxigorpm-my-export.fbx",
-            qc = @"D:\Gmod\unarchive-models\kroxigor\decompile\kroxigorpm.qc",
-        },
-    };
+            var byAsset = new Dictionary<string, Character>(StringComparer.OrdinalIgnoreCase);
+            if (Directory.Exists(SourceRoot))
+                foreach (var modelDir in Directory.GetDirectories(SourceRoot))
+                {
+                    string export = Path.Combine(modelDir, "export");
+                    if (!Directory.Exists(export)) continue;
+                    foreach (var qcDir in Directory.GetDirectories(export))
+                        foreach (var f in Directory.GetFiles(qcDir, "*.fbx"))
+                        {
+                            string stem = Path.GetFileNameWithoutExtension(f);
+                            if (!IsVariant(stem)) continue;
+                            string asset = GmodModelImport.Root + "/" + Path.GetFileName(modelDir) + "/" + Path.GetFileName(qcDir) + "/" + Path.GetFileName(f);
+                            byAsset[asset] = Make(asset, f);
+                        }
+                }
+            if (Directory.Exists(GmodModelImport.Root))
+                foreach (var f in Directory.GetFiles(GmodModelImport.Root, "*.fbx", SearchOption.AllDirectories))
+                {
+                    string asset = f.Replace('\\', '/');
+                    var parts = asset.Substring(GmodModelImport.Root.Length + 1).Split('/');
+                    if (parts.Length != 3 || !IsVariant(Path.GetFileNameWithoutExtension(asset)) || byAsset.ContainsKey(asset)) continue;
+                    byAsset[asset] = Make(asset, null);
+                }
+            return byAsset.Values.OrderBy(c => c.model, StringComparer.OrdinalIgnoreCase).ThenBy(c => c.group, StringComparer.OrdinalIgnoreCase)
+                                 .ThenBy(c => c.nsfw).ThenBy(c => c.name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+    }
+
+    static Character Make(string asset, string source)
+    {
+        var parts = asset.Substring(GmodModelImport.Root.Length + 1).Split('/');
+        string stem = Path.GetFileNameWithoutExtension(asset);
+        return new Character
+        {
+            name = stem, model = parts[0], group = parts[1], source = source, asset = asset, qc = FindQc(parts[0], parts[1]),
+            nsfw = VariantName.Match(stem).Groups[1].Value.Equals("nsfw", StringComparison.OrdinalIgnoreCase),
+        };
+    }
+
+    static readonly Dictionary<string, string> qcCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The decompiled QC of a qc group: under the model's own folder first (decompile*), then anywhere in the source.</summary>
+    static string FindQc(string model, string group)
+    {
+        string key = model + "/" + group, hit;
+        if (qcCache.TryGetValue(key, out hit)) return hit;
+        hit = null;
+        if (Directory.Exists(SourceRoot))
+        {
+            string own = Path.Combine(SourceRoot, model);
+            var found = (Directory.Exists(own) ? Directory.GetFiles(own, group + ".qc", SearchOption.AllDirectories) : new string[0])
+                        .Concat(Directory.GetFiles(SourceRoot, group + ".qc", SearchOption.AllDirectories)).ToList();
+            hit = found.OrderBy(p => p.Contains(Path.DirectorySeparatorChar + "decompile" + Path.DirectorySeparatorChar) ? 0 : 1).FirstOrDefault();
+        }
+        qcCache[key] = hit;
+        return hit;
+    }
+
+    /// <summary>The character clips are measured on and sheets drawn with.</summary>
+    public static Character Reference
+    {
+        get
+        {
+            var all = Characters;
+            return all.FirstOrDefault(c => c.name.Equals(ReferenceName, StringComparison.OrdinalIgnoreCase) && AvatarOf(c) != null)
+                   ?? all.FirstOrDefault(c => !c.nsfw && AvatarOf(c) != null) ?? all.FirstOrDefault();
+        }
+    }
 
     const string VB = "ValveBiped.Bip01_";
 
@@ -55,31 +136,104 @@ public static class CharacterRigSetup
     [MenuItem("Tools/Characters/Set Up Rigs")]
     static void Menu() { SetUpAll(); }
 
+    /// <summary>"chars": copies newer sources in, sets up every variant that needs it (one batch of reimports), checks them all.</summary>
     public static void SetUpAll()
     {
-        int ok = 0;
-        foreach (var c in Characters)
+        var chars = Characters;
+        if (chars.Count == 0) { EditorAutomation.Log("CHARS_FAILED: no SFW / NSFW variants in " + SourceRoot + " or " + GmodModelImport.Root); return; }
+        var copied = Sync(chars);
+
+        // the human descriptions first (each from its model as it is now), then all the reimports together
+        var todo = new List<KeyValuePair<Character, HumanDescription>>();
+        var notes = new Dictionary<Character, string>();
+        int failed = 0;
+        foreach (var c in chars)
         {
-            try { if (SetUp(c)) ok++; }
-            catch (Exception e) { EditorAutomation.Log("  " + c.name + ": ERROR " + e.Message); }
+            var mi = AssetImporter.GetAtPath(c.asset) as ModelImporter;
+            if (mi == null) { EditorAutomation.Log("  FAIL " + c.name + ": not imported (" + c.asset + ")"); failed++; continue; }
+            var avatar = AvatarOf(c);
+            bool current = mi.userData == RigVersion && mi.animationType == ModelImporterAnimationType.Human && avatar != null && avatar.isValid && avatar.isHuman;
+            if (current && !copied.Contains(c.asset)) continue;
+            try
+            {
+                string note; var hd = Describe(c, out note);
+                notes[c] = note + (copied.Contains(c.asset) ? " (copied in from the source)" : "");
+                todo.Add(new KeyValuePair<Character, HumanDescription>(c, hd));
+            }
+            catch (Exception e) { EditorAutomation.Log("  FAIL " + c.name + ": " + e.Message); failed++; }
         }
-        EditorAutomation.Log(ok == Characters.Length ? "CHARS_OK (" + ok + ")" : "CHARS_FAILED: " + (Characters.Length - ok) + " of " + Characters.Length);
+        if (todo.Count > 0)
+        {
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                foreach (var kv in todo)
+                {
+                    var mi = (ModelImporter)AssetImporter.GetAtPath(kv.Key.asset);
+                    mi.animationType = ModelImporterAnimationType.Human;
+                    mi.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                    mi.humanDescription = kv.Value;
+                    mi.optimizeGameObjects = false;
+                    mi.importAnimation = false;
+                    mi.userData = RigVersion;
+                    mi.SaveAndReimport();
+                }
+            }
+            finally { AssetDatabase.StopAssetEditing(); }
+        }
+
+        int ok = 0;
+        var rendered = new HashSet<string>();
+        foreach (var c in chars)
+        {
+            var avatar = AvatarOf(c);
+            bool good = avatar != null && avatar.isValid && avatar.isHuman;
+            if (good) ok++;
+            string note;
+            if (notes.TryGetValue(c, out note) || !good)
+                EditorAutomation.Log("  " + (good ? "ok   " : "FAIL ") + c.name + ": " + (note ?? "") + ", avatar " + (avatar == null ? "MISSING" : (avatar.isValid ? "valid" : "INVALID") + (avatar.isHuman ? ", human" : ", NOT human")));
+            if (good && notes.ContainsKey(c) && rendered.Add(c.group)) { RenderPose(c); RenderHumanPoses(c, avatar, "chars_" + c.group.ToLowerInvariant()); }
+        }
+        EditorAutomation.Log("  " + chars.Count + " variants of " + chars.Select(c => c.group).Distinct().Count() + " models (" + chars.Count(c => c.nsfw) + " NSFW), "
+                             + todo.Count + " set up now, " + copied.Count + " files copied in");
+        EditorAutomation.Log(ok == chars.Count ? "CHARS_OK (" + ok + ")" : "CHARS_FAILED: " + (chars.Count - ok) + " of " + chars.Count);
     }
 
     /// <summary>The character's avatar, once set up.</summary>
     public static Avatar AvatarOf(Character c) { return AssetDatabase.LoadAllAssetsAtPath(c.asset).OfType<Avatar>().FirstOrDefault(); }
 
-    /// <summary>Copies the source in when the project has none or an older one. True if it did.</summary>
-    static bool Sync(Character c)
+    /// <summary>Copies newer source variants and textures (the qc folder's textures/) into the project, in one import. The
+    /// copies keep the source's time, so "newer" stays a plain comparison. Returns the project paths of the variants copied.</summary>
+    static HashSet<string> Sync(List<Character> chars)
     {
-        bool have = File.Exists(c.asset), src = File.Exists(c.source);
-        if (!src) { if (!have) throw new Exception("neither " + c.source + " nor " + c.asset + " exists"); return false; }
-        if (have && File.GetLastWriteTimeUtc(c.source) <= File.GetLastWriteTimeUtc(c.asset)) return false;
-        Directory.CreateDirectory(Path.GetDirectoryName(c.asset));
-        File.Copy(c.source, c.asset, true);
-        File.SetLastWriteTimeUtc(c.asset, File.GetLastWriteTimeUtc(c.source));
-        AssetDatabase.ImportAsset(c.asset, ImportAssetOptions.ForceUpdate);
-        return true;
+        var copied = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var files = new List<KeyValuePair<string, string>>();
+        foreach (var c in chars)
+            if (c.source != null && File.Exists(c.source)) files.Add(new KeyValuePair<string, string>(c.source, c.asset));
+        foreach (var g in chars.Where(c => c.source != null).GroupBy(c => c.model + "/" + c.group))
+        {
+            var c = g.First();
+            string tex = Path.Combine(Path.GetDirectoryName(c.source), "textures");
+            if (!Directory.Exists(tex)) continue;
+            foreach (var f in Directory.GetFiles(tex, "*", SearchOption.AllDirectories))
+            {
+                string ext = Path.GetExtension(f).ToLowerInvariant();
+                if (ext != ".png" && ext != ".tga" && ext != ".jpg" && ext != ".jpeg") continue;
+                files.Add(new KeyValuePair<string, string>(f, Path.GetDirectoryName(c.asset).Replace('\\', '/') + "/textures/" + f.Substring(tex.Length + 1).Replace('\\', '/')));
+            }
+        }
+        var newer = files.Where(kv => !File.Exists(kv.Value) || File.GetLastWriteTimeUtc(kv.Key) > File.GetLastWriteTimeUtc(kv.Value)).ToList();
+        if (newer.Count == 0) return copied;
+        foreach (var kv in newer)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(kv.Value));
+            File.Copy(kv.Key, kv.Value, true);
+            File.SetLastWriteTimeUtc(kv.Value, File.GetLastWriteTimeUtc(kv.Key));
+            if (kv.Value.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase)) copied.Add(kv.Value);
+        }
+        EditorAutomation.Log("  copied in from " + SourceRoot + ": " + copied.Count + " variants, " + (newer.Count - copied.Count) + " textures");
+        AssetDatabase.Refresh();
+        return copied;
     }
 
     static void Aim(Transform t, Transform child, Vector3 dir)
@@ -123,15 +277,43 @@ public static class CharacterRigSetup
         return chain;
     }
 
-    public static bool SetUp(Character c)
+    /// <summary>The variant's human description: its bones mapped, its skeleton as it stands in the T-pose.</summary>
+    static HumanDescription Describe(Character c, out string note)
     {
-        bool copied = Sync(c);
         var model = AssetDatabase.LoadAssetAtPath<GameObject>(c.asset);
         if (model == null) throw new Exception("not imported: " + c.asset);
-        var mi = (ModelImporter)AssetImporter.GetAtPath(c.asset);
-        string tag = "chars_" + c.name.ToLowerInvariant();
+        var scene = EditorSceneManager.NewPreviewScene();
+        try
+        {
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(model, scene);
+            inst.transform.position = Vector3.zero; inst.transform.rotation = Quaternion.identity;
+            var all = inst.GetComponentsInChildren<Transform>(true);
+            Func<string, Transform> bone = n => all.FirstOrDefault(t => t.name == VB + n);
+            if (bone("Pelvis") == null || bone("L_UpperArm") == null || bone("R_UpperArm") == null) throw new Exception("no ValveBiped skeleton in " + c.asset);
 
-        HumanDescription hd; float drop; int mapped; string spine;
+            float drop = TPose(bone);
+            var human = new List<HumanBone>();
+            Action<string, Transform> add = (h, t) => { if (t != null) human.Add(new HumanBone { humanName = h, boneName = t.name, limit = new HumanLimit { useDefaultValues = true } }); };
+            for (int i = 0; i < Map.GetLength(0); i++) add(Map[i, 0], bone(Map[i, 1]));
+            var chain = SpineChain(bone);
+            string[] slots = { "Spine", "Chest", "UpperChest" };
+            for (int i = 0; i < chain.Count; i++) add(slots[i], chain[i]);
+            note = human.Count + " human bones, spine " + string.Join(" / ", chain.Select(t => t.name.Replace(VB, "")).ToArray()) + ", arms raised " + drop.ToString("0") + " deg to the T-pose";
+            var skeleton = all.Select(t => new SkeletonBone { name = t.name, position = t.localPosition, rotation = t.localRotation, scale = t.localScale }).ToArray();
+            return new HumanDescription
+            {
+                human = human.ToArray(), skeleton = skeleton,
+                upperArmTwist = 0.5f, lowerArmTwist = 0.5f, upperLegTwist = 0.5f, lowerLegTwist = 0.5f,
+                armStretch = 0.05f, legStretch = 0.05f, feetSpacing = 0f, hasTranslationDoF = false,
+            };
+        }
+        finally { EditorSceneManager.ClosePreviewScene(scene); }
+    }
+
+    /// <summary>The rest pose next to the avatar's T-pose.</summary>
+    static void RenderPose(Character c)
+    {
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(c.asset);
         var scene = PreviewShots.Begin();
         try
         {
@@ -139,51 +321,14 @@ public static class CharacterRigSetup
             var inst = (GameObject)PrefabUtility.InstantiatePrefab(model, scene);
             inst.transform.position = new Vector3(4f, 0f, 0f);
             var all = inst.GetComponentsInChildren<Transform>(true);
-            Func<string, Transform> bone = n => all.FirstOrDefault(t => t.name == VB + n);
-            if (bone("Pelvis") == null || bone("L_UpperArm") == null || bone("R_UpperArm") == null) throw new Exception("no ValveBiped skeleton in " + c.asset);
-
-            drop = TPose(bone);
-            var human = new List<HumanBone>();
-            Action<string, Transform> add = (h, t) => { if (t != null) human.Add(new HumanBone { humanName = h, boneName = t.name, limit = new HumanLimit { useDefaultValues = true } }); };
-            for (int i = 0; i < Map.GetLength(0); i++) add(Map[i, 0], bone(Map[i, 1]));
-            var chain = SpineChain(bone);
-            string[] slots = { "Spine", "Chest", "UpperChest" };
-            for (int i = 0; i < chain.Count; i++) add(slots[i], chain[i]);
-            mapped = human.Count; spine = string.Join(" / ", chain.Select(t => t.name.Replace(VB, "")).ToArray());
-
-            // the skeleton as it stands in the T-pose: the instance itself (root first), its offset taken off
-            inst.transform.position = Vector3.zero;
-            var skeleton = inst.GetComponentsInChildren<Transform>(true)
-                               .Select(t => new SkeletonBone { name = t.name, position = t.localPosition, rotation = t.localRotation, scale = t.localScale }).ToArray();
-            inst.transform.position = new Vector3(4f, 0f, 0f);
-            hd = new HumanDescription
-            {
-                human = human.ToArray(), skeleton = skeleton,
-                upperArmTwist = 0.5f, lowerArmTwist = 0.5f, upperLegTwist = 0.5f, lowerLegTwist = 0.5f,
-                armStretch = 0.05f, legStretch = 0.05f, feetSpacing = 0f, hasTranslationDoF = false,
-            };
-
+            TPose(n => all.FirstOrDefault(t => t.name == VB + n));
             Bounds b0 = PreviewShots.BoundsOf(rest), b1 = PreviewShots.BoundsOf(inst);
             float h = Mathf.Max(b0.size.y, b1.size.y) * 1.05f;
-            PreviewShots.Render(scene, tag + "_pose", 700, 800,
+            PreviewShots.Render(scene, "chars_" + c.group.ToLowerInvariant() + "_pose", 700, 800,
                 new PreviewShots.Frame(new Vector3(b0.center.x, h * 0.5f, b0.center.z), h, Vector3.forward),
                 new PreviewShots.Frame(new Vector3(b1.center.x, h * 0.5f, b1.center.z), h, Vector3.forward));
         }
         finally { EditorSceneManager.ClosePreviewScene(scene); }
-
-        mi.animationType = ModelImporterAnimationType.Human;
-        mi.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
-        mi.humanDescription = hd;
-        mi.optimizeGameObjects = false;
-        mi.importAnimation = false;
-        mi.SaveAndReimport();
-
-        var avatar = AvatarOf(c);
-        bool good = avatar != null && avatar.isValid && avatar.isHuman;
-        EditorAutomation.Log("  " + (good ? "ok   " : "FAIL ") + c.name + (copied ? " (copied in from the source)" : "") + ": " + mapped + " human bones, spine " + spine
-                             + ", arms raised " + drop.ToString("0") + " deg to the T-pose, avatar " + (avatar == null ? "MISSING" : (avatar.isValid ? "valid" : "INVALID") + (avatar.isHuman ? ", human" : ", NOT human")));
-        if (good) RenderHumanPoses(c, avatar, tag);
-        return good;
     }
 
     /// <summary>The avatar driving the bones: all muscles at zero (Unity's neutral pose), and a test pose (left arm up, right arm

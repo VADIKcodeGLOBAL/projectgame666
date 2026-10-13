@@ -331,9 +331,14 @@ public static partial class EditorAutomation
         float closest = 99f;
         var bcc = bot.GetComponent<CharacterController>();
         yield return Run(1.5f, () => closest = Mathf.Min(closest, Horiz(fp.transform.position, bot.transform.position)));
-        // a CharacterController's solid shape is its radius minus its skin width (the skin is where other controllers stop)
-        float minGap = rad + (bcc.radius - bcc.skinWidth) * bot.transform.localScale.x;
-        Check(closest >= minGap - 0.03f, "bot in the way: closest " + F3(closest) + " m between the axes (solid radii " + F3(minGap) + ")");
+        // where the player's capsule touches the bot's as the queries see it (a CharacterController's query shape is smaller
+        // than its radius): the same capsule swept straight at the bot's axis
+        Vector3 bp = bot.transform.position, behind = bp - Fw * 4f; behind.y = fp.transform.position.y;
+        Vector3 cp0 = behind + Vector3.up * rad, cp1 = behind + Vector3.up * (motor.Height - rad);
+        RaycastHit touch; float minGap = rad + bcc.radius;
+        if (Physics.CapsuleCast(cp0, cp1, rad, Fw, out touch, 10f, 1 << bot.gameObject.layer, QueryTriggerInteraction.Ignore))
+            minGap = Horiz(behind + Fw * touch.distance, bp);
+        Check(closest >= minGap - 0.03f, "bot in the way: closest " + F3(closest) + " m between the axes (capsules touch at " + F3(minGap) + ", controller radius " + F3(bcc.radius) + ")");
         fp.ClearTestInput(); bot.Die(false); yield return Wait(0.4f);
 
         // ---- 9. ramps: 30 deg is walked up, 60 deg cannot be climbed and slides you down

@@ -46,11 +46,13 @@ public class CharacterAnimator : MonoBehaviour
         animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms; // off screen: the state runs on, the bones are not posed
     }
 
-    /// <summary>Picks this character's clip set; size = the body's scale (natural speeds grow with it).</summary>
-    public void Init(System.Random rnd, float size)
+    /// <summary>Picks this character's clip set. The clips' natural speeds (measured on the library's reference character) grow
+    /// with this character's own build and its scale in the world: call it once the body has its size.</summary>
+    public void Init(System.Random rnd)
     {
         if (animator == null) Awake();
-        scale = Mathf.Max(0.1f, size);
+        float build = library != null && library.referenceHumanScale > 0f && animator.isHuman ? animator.humanScale / library.referenceHumanScale : 1f;
+        scale = Mathf.Max(0.1f, build * transform.lossyScale.y);
         var sets = SetsFor(animator.runtimeAnimatorController);
         if (sets.Count > 0) { set = sets[rnd.Next(sets.Count)]; animator.runtimeAnimatorController = set.controller; }
         animator.Rebind();

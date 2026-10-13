@@ -21,6 +21,8 @@ public class EnemyBot : MonoBehaviour
     [Tooltip("The character's animation (none on the box bot).")] public CharacterAnimator character;
     [Tooltip("The character's renderers, lit up for a moment by a hit.")] public Renderer[] flashRenderers;
     [Tooltip("A dead character lies this long before it sinks into the ground, s.")] public float deathLinger = 2.2f;
+    [Tooltip("The model a character enemy is a variant of (empty on the box bot).")] public string model;
+    [Tooltip("An NSFW variant: changed for a safe one when the player turns NSFW models off.")] public bool nsfw;
 
     const float SinkTime = 0.9f, SinkDepth = 1.4f;
 
@@ -36,7 +38,7 @@ public class EnemyBot : MonoBehaviour
     MaterialPropertyBlock block;
     Transform target; PlayerHealth targetHealth;
     Color glow = new Color(1f, 0.35f, 0.1f);
-    float vy, nextAttack, flash, stuckCheck, sidestepUntil, sideSign = 1f, dieTime, pendingDt;
+    float vy, nextAttack, flash, stuckCheck, sidestepUntil, sideSign = 1f, dieTime, pendingDt, size = 1f;
     Vector3 lastPos, baseScale;
     int gridIndex = -1, lodSlot;
     /// <summary>Within FullRateDistance of the player a bot is updated every frame, up to ThirdRateDistance every third frame,
@@ -134,12 +136,25 @@ public class EnemyBot : MonoBehaviour
     {
         cc = GetComponent<CharacterController>();
         target = player; targetHealth = player != null ? player.GetComponent<PlayerHealth>() : null;
-        maxHealth = health; Health = health; speed = moveSpeed; damage = hitDamage; glow = glowColor;
+        maxHealth = health; Health = health; speed = moveSpeed; damage = hitDamage; glow = glowColor; this.size = size;
         transform.localScale = Vector3.one * size; baseScale = transform.localScale;
         lastPos = transform.position; stuckCheck = Time.time + 1f; sideSign = Random.value < 0.5f ? -1f : 1f;
         lodSlot = Random.Range(0, 6); pendingDt = 0f;                  // spread the far bots over the frames they skip
-        if (character != null) character.Init(new System.Random(Random.Range(0, int.MaxValue)), size);
+        if (character != null) character.Init(new System.Random(Random.Range(0, int.MaxValue)));
         ApplyLook();
+    }
+
+    /// <summary>This bot changed for another enemy (a prefab) in its place: the same stats, health, size, glow and pause in its
+    /// stride; this one is gone without a kill. Null (and nothing changed) while it is dying.</summary>
+    public EnemyBot SwapFor(EnemyBot prefab)
+    {
+        if (IsDying || prefab == null) return null;
+        var b = Instantiate(prefab, transform.position, transform.rotation);
+        b.Init(target, maxHealth, speed, damage, size, glow);
+        b.Health = Health; b.nextAttack = nextAttack; b.staggerUntil = staggerUntil; b.knock = knock;
+        gameObject.SetActive(false);                                    // out of All (raycasts, the grid, the count) at once
+        Destroy(gameObject);
+        return b;
     }
 
     static readonly int ColorId = Shader.PropertyToID("_Color");

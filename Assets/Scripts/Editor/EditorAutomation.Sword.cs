@@ -154,6 +154,9 @@ public static partial class EditorAutomation
         inv.Select(0); t0 = Time.time;
         while (inv.IsSwitching && Time.time < t0 + 3f) yield return null;
         int shots = inv.ShotsFired; fp.Pitch = -70f;
+        // the bots cut down above may have dropped supplies: a syringe on the way would speed the walk up
+        for (int i = SupplyPickup.All.Count - 1; i >= 0; i--) if (SupplyPickup.All[i] != null) Object.Destroy(SupplyPickup.All[i].gameObject);
+        fp.ClearSpeedBoost();
         fp.SetTestInput(Vector3.forward, false, false);
         inv.SetTestInput(true, false); yield return Wait(0.5f); inv.SetTestInput(false, false); inv.ClearTestInput();
         float gunV = fp.PlanarVelocity.magnitude;

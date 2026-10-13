@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Pause menu with the settings: Esc opens and closes it. While it is open the game is paused (time scale 0)
-/// and the mouse is free. Sliders: overall volume, music, shots, field of view, FOV effects, mouse sensitivity;
-/// changes apply at once and are saved on close.
+/// and the mouse is free. Sliders: overall volume, music, shots, field of view, FOV effects, mouse sensitivity; a checkbox for the
+/// NSFW character models; changes apply at once and are saved on close.
 /// </summary>
 public class SettingsMenu : MonoBehaviour
 {
@@ -11,7 +11,7 @@ public class SettingsMenu : MonoBehaviour
 
     public static bool IsOpen { get; private set; }
 
-    GUIStyle title, label, value, button, note;
+    GUIStyle title, label, value, button, note, check;
     float timeScaleBefore = 1f;
 
     void Awake() { IsOpen = false; Time.timeScale = 1f; useGUILayout = false; }   // GUI.* only: skip the Layout event
@@ -62,11 +62,12 @@ public class SettingsMenu : MonoBehaviour
             value = new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold };
             button = new GUIStyle(GUI.skin.button) { fontSize = 16, fontStyle = FontStyle.Bold };
             note = new GUIStyle(GUI.skin.label) { fontSize = 12, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            check = new GUIStyle(GUI.skin.toggle) { fontSize = 17, alignment = TextAnchor.MiddleLeft };
         }
         GUI.depth = -10;
-        float w = Screen.width, h = Screen.height, px = w * 0.5f - 230f, py = h * 0.5f - 246f;
+        float w = Screen.width, h = Screen.height, px = w * 0.5f - 230f, py = h * 0.5f - 269f;
         Box(new Rect(0f, 0f, w, h), new Color(0f, 0f, 0f, 0.55f));
-        Box(new Rect(px, py, 460f, 492f), new Color(0.08f, 0.09f, 0.11f, 0.95f));
+        Box(new Rect(px, py, 460f, 538f), new Color(0.08f, 0.09f, 0.11f, 0.95f));
         Box(new Rect(px, py, 460f, 4f), new Color(1f, 0.85f, 0.4f));
         GUI.Label(new Rect(px, py + 14f, 460f, 40f), "SETTINGS", title);
 
@@ -79,6 +80,7 @@ public class SettingsMenu : MonoBehaviour
         GameSettings.FovEffects = Mathf.Round(Slider(y, "FOV effects", GameSettings.FovEffects, 0f, GameSettings.MaxFovEffects, GameSettings.FovEffects <= 0f ? "Off" : Pct(GameSettings.FovEffects)) * 20f) / 20f; y += 46f;
         // 5 % steps, so the default 100 % is easy to hit again
         GameSettings.MouseSensitivity = Mathf.Round(Slider(y, "Mouse sensitivity", GameSettings.MouseSensitivity, GameSettings.MinMouse, GameSettings.MaxMouse, Pct(GameSettings.MouseSensitivity)) * 20f) / 20f; y += 46f;
+        GameSettings.NsfwModels = GUI.Toggle(new Rect(px + 24f, y, 412f, 26f), GameSettings.NsfwModels, "  NSFW models (enemies)", check); y += 46f;
 
         string tracks = music == null ? "no music player" : music.TrackCount == 0
             ? "No music yet: put tracks into Assets/Audio/Music"

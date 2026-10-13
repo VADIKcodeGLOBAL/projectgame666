@@ -39,7 +39,7 @@ MonoBehaviour:
     license: made by the project
     file: Assets/Art/Animations/_Test/Test_Run.anim
     loop: 1
-    speed: 3.152895
+    speed: 3.1528952
     weight: 1
     enabled: 1
     test: 1
@@ -49,7 +49,7 @@ MonoBehaviour:
     license: made by the project
     file: Assets/Art/Animations/_Test/Test_Climb.anim
     loop: 1
-    speed: 0.8383752
+    speed: 0.83837557
     weight: 1
     enabled: 1
     test: 1
@@ -93,3 +93,4 @@ MonoBehaviour:
     weight: 1
     enabled: 1
     test: 1
+  referenceHumanScale: 1.1134564

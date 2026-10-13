@@ -43,9 +43,9 @@ public static class AnimationLibraryBuilder
     public static void Build()
     {
         EditorAutomation.Log("ANIMS build");
-        var character = CharacterRigSetup.Characters[0];
-        var avatar = CharacterRigSetup.AvatarOf(character);
-        if (avatar == null || !avatar.isHuman) { EditorAutomation.Log("ANIMS_FAILED: no humanoid avatar for " + character.name + " (run \"chars\" first)"); return; }
+        var character = CharacterRigSetup.Reference;
+        var avatar = character != null ? CharacterRigSetup.AvatarOf(character) : null;
+        if (avatar == null || !avatar.isHuman) { EditorAutomation.Log("ANIMS_FAILED: no humanoid avatar for " + (character != null ? character.name : "any character") + " (run \"chars\" first)"); return; }
 
         var scene = PreviewShots.Begin();
         try
@@ -59,6 +59,7 @@ public static class AnimationLibraryBuilder
             var slots = MakeTestClips(inst, avatar);
             var lib = LoadOrCreate<AnimationLibrary>(LibraryPath);
             UpdateLibrary(lib, inst, anim);
+            lib.referenceHumanScale = anim.humanScale;
             var ctrl = EnsureController(slots);
             EditorUtility.SetDirty(lib); AssetDatabase.SaveAssets();
 
@@ -78,8 +79,8 @@ public static class AnimationLibraryBuilder
     /// <summary>"anim-probe &lt;clip name&gt;": where the feet and hands of the reference character are (root space, m) at five moments of a clip.</summary>
     public static void Probe(string clipName)
     {
-        var character = CharacterRigSetup.Characters[0];
-        var avatar = CharacterRigSetup.AvatarOf(character);
+        var character = CharacterRigSetup.Reference;
+        var avatar = character != null ? CharacterRigSetup.AvatarOf(character) : null;
         var lib = AssetDatabase.LoadAssetAtPath<AnimationLibrary>(LibraryPath);
         var entry = lib != null ? lib.clips.FirstOrDefault(e => e.clip != null && e.clip.name.Equals(clipName, StringComparison.OrdinalIgnoreCase)) : null;
         if (avatar == null || entry == null) { EditorAutomation.Log("PROBE_FAILED: no avatar or no clip " + clipName); return; }

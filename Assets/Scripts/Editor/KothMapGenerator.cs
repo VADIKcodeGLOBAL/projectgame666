@@ -1143,7 +1143,7 @@ public static class KothMapGenerator
         var game = gameGo.AddComponent<WaveSurvivalGame>();
         game.waves = s.waves; game.waveDuration = s.waveDuration; game.batchInterval = s.batchInterval; game.mobsPerBatch = s.mobsPerBatch;
         game.zone = zone; game.player = player.transform; game.botPrefab = MakeBotPrefab();
-        game.characterBots = EnemyPrefabs.BuildAll().ToArray();                  // animated characters if the models are here, else the box
+        game.roster = EnemyPrefabs.BuildAll();                                   // animated characters if the models are here, else the box
         game.spawnRadius = Mathf.Min(s.playRadius + 15f, half - 14f); game.mapHalfSize = half - 8f;
         var hud = gameGo.AddComponent<SurvivalHud>(); hud.game = game; hud.health = health; hud.weapons = weapons;
         HudSetup.Build(hud);                                                      // the HUD canvas, visible in the editor

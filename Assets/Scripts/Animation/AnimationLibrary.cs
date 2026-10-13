@@ -31,6 +31,8 @@ public class AnimationLibrary : ScriptableObject
     }
 
     public List<Entry> clips = new List<Entry>();
+    [Tooltip("Human scale (hips height) of the reference character the speeds were measured on: a character plays them scaled by its own.")]
+    public float referenceHumanScale = 1f;
 
     /// <summary>The clips that serve a tag: the real ones if there are any, otherwise the test ones.</summary>
     public List<Entry> Of(AnimTag tag)

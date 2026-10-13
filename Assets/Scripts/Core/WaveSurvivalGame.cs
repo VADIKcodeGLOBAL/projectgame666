@@ -7,6 +7,8 @@ using UnityEngine.SceneManagement;
 ///    outside, the waves go on — bots keep coming every batchInterval seconds — but your progress is frozen;
 ///  - every batchInterval seconds a batch of bots comes over the ridge: mobsPerBatch * wave number;
 ///  - each wave the bots get more health, speed, damage and size; bots left over carry on into the next wave;
+///  - the enemies are the roster's characters (bigger models in later waves, NSFW variants only if the player allows them), or
+///    the box bot without them;
 ///  - the game is lost when the player dies, won when the last wave's timer runs out.
 /// </summary>
 public class WaveSurvivalGame : MonoBehaviour
@@ -24,8 +26,8 @@ public class WaveSurvivalGame : MonoBehaviour
 
     [Header("Bots")]
     [Tooltip("The box bot: the enemy when there are no characters (the models are not in the repository).")] public EnemyBot botPrefab;
-    [Tooltip("Animated character enemies (Assets/Art/Characters/Gmod/_Enemies, made by the \"enemies\" command); one is picked per bot.")]
-    public EnemyBot[] characterBots = new EnemyBot[0];
+    [Tooltip("Animated character enemies by wave (Assets/Art/Characters/Gmod/_Enemies/EnemyRoster.asset, made by the \"enemies\" command).")]
+    public EnemyRoster roster;
     [Tooltip("Distance from the hill at which bots appear (up on the boundary ridge).")] public float spawnRadius = 250f;
     public float baseHealth = 40f, healthPerWave = 0.2f;
     public float baseSpeed = 7.5f, speedPerWave = 0.35f;
@@ -69,6 +71,9 @@ public class WaveSurvivalGame : MonoBehaviour
 
     PlayerHealth health;
     float batchTimer; int toSpawn; float spawnTick; float batchAngle; float summitAmmoTimer, summitMedkitTimer;
+
+    void OnEnable() { GameSettings.NsfwModelsChanged += OnNsfwChanged; }
+    void OnDisable() { GameSettings.NsfwModelsChanged -= OnNsfwChanged; }
 
     void Awake()
     {
@@ -133,17 +138,31 @@ public class WaveSurvivalGame : MonoBehaviour
         batchAngle = Random.Range(0f, 360f);                           // each batch arrives from three directions
     }
 
-    /// <summary>The enemy to spawn: one of the characters if there are any, the box bot otherwise.</summary>
+    static readonly System.Func<float> Random01 = () => Random.value;     // one delegate, not one per spawn
+
+    /// <summary>The enemy to spawn now: one of the roster's characters for this wave (before the first: the first wave's), the
+    /// box bot without them.</summary>
     public EnemyBot EnemyPrefab
     {
         get
         {
-            int n = 0;
-            if (characterBots != null) foreach (var c in characterBots) if (c != null) n++;
-            if (n == 0) return botPrefab;
-            int pick = Random.Range(0, n);
-            foreach (var c in characterBots) if (c != null && pick-- == 0) return c;
-            return botPrefab;
+            var c = roster != null ? roster.Pick(Wave, GameSettings.NsfwModels, Random01) : null;
+            return c != null ? c : botPrefab;
+        }
+    }
+
+    /// <summary>NSFW models turned off: the NSFW enemies there are changed for safe ones in their place (same model if it has a
+    /// safe variant).</summary>
+    void OnNsfwChanged()
+    {
+        if (GameSettings.NsfwModels || roster == null) return;
+        for (int i = EnemyBot.All.Count - 1; i >= 0; i--)
+        {
+            var b = EnemyBot.All[i];
+            if (b == null || !b.nsfw) continue;
+            var safe = b.IsDying ? null : roster.SfwFor(b.model, Random01);
+            if (safe != null) b.SwapFor(safe);
+            else { b.gameObject.SetActive(false); Destroy(b.gameObject); }   // a body on the ground, or no safe enemy at all: gone
         }
     }
 

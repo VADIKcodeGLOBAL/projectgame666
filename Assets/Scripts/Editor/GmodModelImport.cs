@@ -94,7 +94,8 @@ public class GmodModelImport : AssetPostprocessor
 
     public static void Check()
     {
-        var fbxs = AssetDatabase.FindAssets("t:Model", new[] { Root }).Select(AssetDatabase.GUIDToAssetPath).Where(p => p.EndsWith(".fbx", System.StringComparison.OrdinalIgnoreCase)).OrderBy(p => p).ToList();
+        var fbxs = AssetDatabase.FindAssets("t:Model", new[] { Root }).Select(AssetDatabase.GUIDToAssetPath)
+                                .Where(p => p.EndsWith(".fbx", System.StringComparison.OrdinalIgnoreCase) && CharacterRigSetup.IsVariant(Path.GetFileNameWithoutExtension(p))).OrderBy(p => p).ToList();
         EditorAutomation.Log("gmod-check: " + fbxs.Count + " FBX under " + Root);
         if (fbxs.Count == 0) { EditorAutomation.Log("GMODCHECK_FAILED: no models"); return; }
 
