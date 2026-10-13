@@ -122,12 +122,14 @@ public static class EnemyPrefabs
             cc.height = Mathf.Max(boxCc.height, h * 0.9f); cc.radius = boxCc.radius; cc.center = new Vector3(0f, cc.height * 0.5f, 0f);
             cc.slopeLimit = boxCc.slopeLimit; cc.stepOffset = boxCc.stepOffset * BodyScale; cc.skinWidth = boxCc.skinWidth;
             bot.attackRange = box.attackRange * Mathf.Clamp(h / 2f, 1f, 1.6f);
+            // the controller rests its skin width above the ground: the feet go down onto it
+            model.transform.localPosition = new Vector3(0f, -cc.skinWidth, 0f);
 
             // the hit box: body-sized, standing on the ground at rest, then carried by the hips (it leans and bobs with them)
             var hips = model.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "ValveBiped.Bip01_Pelvis");
             var hb = new GameObject("HitBox").transform;
             hb.SetParent(root.transform, false);
-            hb.localPosition = new Vector3(0f, h * 0.5f, 0f);
+            hb.localPosition = new Vector3(0f, h * 0.5f - cc.skinWidth, 0f);
             hb.localScale = new Vector3(Mathf.Min(rest.size.x, 0.66f * BodyScale), h * 0.97f, Mathf.Min(rest.size.z, 0.48f * BodyScale));
             if (hips != null) hb.SetParent(hips, true);
             bot.hitBox = hb;

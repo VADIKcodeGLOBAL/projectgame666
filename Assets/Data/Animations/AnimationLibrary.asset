@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: AnimationLibrary
   m_EditorClassIdentifier: Assembly-CSharp::AnimationLibrary
   clips:
+  - clip: {fileID: -203655887218126122, guid: 3a44d92df766b4f4d91d9f7d6d1303b5, type: 3}
+    tag: 0
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/idle.fbx
+    loop: 1
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
   - clip: {fileID: 7400000, guid: d9fe7ae3cc1a7574083b118e5b1d005f, type: 2}
     tag: 0
     source: project (test clip)
@@ -23,6 +34,17 @@ MonoBehaviour:
     weight: 1
     enabled: 1
     test: 1
+  - clip: {fileID: -203655887218126122, guid: 59b7b15ec0b14a64699b61e1d3f915b7, type: 3}
+    tag: 1
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/walking.fbx
+    loop: 1
+    speed: 1.7523792
+    weight: 1
+    enabled: 1
+    test: 0
   - clip: {fileID: 7400000, guid: baf3881f16289eb4fb6bbe77a43b555b, type: 2}
     tag: 1
     source: project (test clip)
@@ -33,6 +55,17 @@ MonoBehaviour:
     weight: 1
     enabled: 1
     test: 1
+  - clip: {fileID: -203655887218126122, guid: 8db5f0d3b9380d84a80fdd847adfd662, type: 3}
+    tag: 2
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/running.fbx
+    loop: 1
+    speed: 4.032718
+    weight: 1
+    enabled: 1
+    test: 0
   - clip: {fileID: 7400000, guid: 19ba026df79f1ab468a4899f05d31e42, type: 2}
     tag: 2
     source: project (test clip)
@@ -53,6 +86,28 @@ MonoBehaviour:
     weight: 1
     enabled: 1
     test: 1
+  - clip: {fileID: -203655887218126122, guid: eeb9c41985ad2ab4e8b51800041485e0, type: 3}
+    tag: 4
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/sasha_mixamo@Hook.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: a095bc86baeaa1947b7a0222ceb0d895, type: 3}
+    tag: 4
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/sasha_mixamo@Mma Kick.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
   - clip: {fileID: 7400000, guid: fd3ddd31307deff42954574eea3e276f, type: 2}
     tag: 4
     source: project (test clip)
@@ -93,4 +148,125 @@ MonoBehaviour:
     weight: 1
     enabled: 1
     test: 1
+  - clip: {fileID: -203655887218126122, guid: abb4fef8d787ee54a9435d6a7e6f3916, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/X Bot@Brutal Assassination.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 864d9d2bec3fd4f42a7145a2a97a1352, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/X Bot@Rumba Dancing.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: e857ec0e88b753b42be2a3b03de731ee, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/jump.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 968dcdcbb439d014bbb1acb479205805, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/left strafe.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 04155da670670c748af8eeda5380eac2, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/left strafe walk.fbx
+    loop: 1
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 4908ef8e7c8042048a6f289412a17280, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/left turn.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 5b962800da1f8ef49948018065be15f0, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/left turn (2).fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 8d94e9144fd9a654ab05fd6066c61122, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/right strafe.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 88b70c2086c2de84395773fbf618d366, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/right strafe walk.fbx
+    loop: 1
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 8be883fd2a0565d4781a0e967f44b16d, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/right turn.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
+  - clip: {fileID: -203655887218126122, guid: 8c3e9c9c4aa62b74589a8bfb9c03d734, type: 3}
+    tag: 8
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/right turn (2).fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
   referenceHumanScale: 1.1134564

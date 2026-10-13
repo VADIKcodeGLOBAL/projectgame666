@@ -384,7 +384,7 @@ public static class AnimationLibraryBuilder
     {
         var entries = lib.clips.Where(e => e.enabled && e.clip != null).ToList();
         Bounds b = PreviewShots.BoundsOf(inst);
-        float h = b.size.y * 1.25f; Vector3 c = new Vector3(inst.transform.position.x, h * 0.42f, inst.transform.position.z);
+        float h = b.size.y * 1.25f; Vector3 c = new Vector3(inst.transform.position.x, h * 0.42f, inst.transform.position.z), home = inst.transform.position;
         const int perPage = 8;
         for (int page = 0; page * perPage < entries.Count; page++)
         {
@@ -395,7 +395,8 @@ public static class AnimationLibraryBuilder
                 for (int k = 0; k < 4; k++)
                 {
                     float t = clip.length * (clip.isLooping ? k / 4f : k / 3f);
-                    frames.Add(new PreviewShots.Frame(c, h, new Vector3(1f, 0.08f, 0.6f), () => { clip.SampleAnimation(inst, t); PreviewShots.Freeze(inst); }));
+                    // sampling applies the clip's ground travel to the root: put it back (the game does not apply it either)
+                    frames.Add(new PreviewShots.Frame(c, h, new Vector3(1f, 0.08f, 0.6f), () => { clip.SampleAnimation(inst, t); inst.transform.position = home; inst.transform.rotation = Quaternion.identity; PreviewShots.Freeze(inst); }));
                 }
             }
             PreviewShots.RenderGrid(scene, "anims_sheet" + (page > 0 ? "_" + (page + 1) : ""), 4, 230, 300, frames.ToArray());
