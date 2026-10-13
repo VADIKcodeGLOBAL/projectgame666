@@ -510,7 +510,6 @@ public static partial class EditorAutomation
             else if (cmd == "enemies") EnemyPrefabs.InstallInOpenScene();
             else if (cmd == "animtest") { moveTestRunner = null; ArmPlaytest("animtest"); }
             else if (cmd.StartsWith("anim-probe ")) AnimationLibraryBuilder.Probe(cmd.Substring(11).Trim());
-            else if (cmd.StartsWith("anim-cut ")) AnimationLibraryBuilder.Cut(cmd.Substring(9).Trim());
             else if (cmd.StartsWith("gmod-mats ")) GmodModelImport.DumpMaterials(cmd.Substring(10).Trim());
             else if (cmd.StartsWith("model ")) ModelMaterialSetup.Setup(cmd.Substring(6).Trim());
             else Log("unknown command");

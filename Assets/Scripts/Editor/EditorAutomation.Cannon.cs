@@ -44,13 +44,10 @@ public static partial class EditorAutomation
         Vector3 fwd = cannon.transform.forward; fwd.y = 0f; fwd.Normalize();
         Vector3 target = onGround(cannon.transform.position + Quaternion.Euler(0f, 25f, 0f) * fwd * 190f);   // the valley floor: a clear arc
         var near = new System.Collections.Generic.List<EnemyBot>(); var far = new System.Collections.Generic.List<EnemyBot>();
-        // around the target but off the line the ball comes in along (a tall bot on it would catch the ball before the ground)
-        Vector3 approach = cannon.transform.position - target; approach.y = 0f; approach.Normalize();
-        float[] around = { 90f, 180f, 270f, 135f, 225f };
         for (int i = 0; i < 5; i++)
         {
             bool inside = i < 3;
-            Vector3 p = onGround(target + Quaternion.Euler(0f, around[i], 0f) * approach * (inside ? 2.5f : 11f)) + Vector3.up * 0.05f;
+            Vector3 p = onGround(target + Quaternion.Euler(0f, i * 72f, 0f) * Vector3.forward * (inside ? 2.5f : 11f)) + Vector3.up * 0.05f;
             var b = Object.Instantiate(game.EnemyPrefab, p, Quaternion.identity);
             b.Init(fp.transform, 60f, 0f, 0f, 1f, Color.white);
             (inside ? near : far).Add(b); moveTemp.Add(b.gameObject);

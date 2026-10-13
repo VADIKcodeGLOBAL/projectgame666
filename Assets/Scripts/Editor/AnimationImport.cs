@@ -71,8 +71,6 @@ public static class AnimTags
         if (Has(s, "react", "hurt", "damage", "impact", "flinch")) return AnimTag.Hit;
         if (Has(s, "attack", "punch", "slash", "strike", "swipe", "bite", "kick", "stab", "swing", "jab", "hook", "smash")) return AnimTag.Attack;
         if (Has(s, "hit")) return AnimTag.Hit;
-        // sideways steps, turns on the spot, jumps and dances are not the forward locomotion the enemies blend
-        if (Has(s, "strafe", "turn", "jump", "dance", "dancing", "backward")) return AnimTag.Emote;
         if (Has(s, "climb", "crawl")) return AnimTag.Climb;
         if (Has(s, "run", "jog", "sprint")) return AnimTag.Run;
         if (Has(s, "walk")) return AnimTag.Walk;

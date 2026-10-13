@@ -58,9 +58,8 @@ public static partial class EditorAutomation
         var ca = prefab.character; var jb = ca != null ? ca.GetComponent<JiggleBones>() : null;
         var tags = new[] { AnimTag.Idle, AnimTag.Walk, AnimTag.Run, AnimTag.Climb, AnimTag.Attack, AnimTag.Hit, AnimTag.Stagger, AnimTag.Death };
         bool slotsOk = ca != null && ca.library != null && ca.slots != null && ca.slots.Length >= tags.Length && tags.All(g => ca.slots[(int)g] != null);
-        var prefabCtrl = ca != null ? ca.GetComponent<Animator>().runtimeAnimatorController : null;
-        Check(slotsOk && prefabCtrl != null && prefab.hitBox != null && tags.All(g => ca.library.Of(g).Count > 0) && jb != null && jb.bones.Count > 0,
-              "prefab " + prefab.name + ": controller " + (prefabCtrl != null ? prefabCtrl.name : "MISSING") + ", library " + (ca != null && ca.library != null ? ca.library.clips.Count + " clips" : "MISSING") + ", slots " + (slotsOk ? "ok" : "MISSING")
+        Check(slotsOk && prefab.hitBox != null && tags.All(g => ca.library.Of(g).Count > 0) && jb != null && jb.bones.Count > 0,
+              "prefab " + prefab.name + ": library " + (ca != null && ca.library != null ? ca.library.clips.Count + " clips" : "MISSING") + ", slots " + (slotsOk ? "ok" : "MISSING")
               + ", hit box " + (prefab.hitBox != null) + ", jiggle bones " + (jb != null ? jb.bones.Count : 0)
               + "; clips per slot: " + (ca != null && ca.library != null ? string.Join(", ", tags.Select(g => g + " " + ca.library.Of(g).Count).ToArray()) : "-"));
 

@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// The animation of a character enemy, driven by its <see cref="EnemyBot"/>: ground speed, climbing, a blow, a hit, a stagger,
-/// death. The controller (Assets/Data/Animations/EnemyCharacter.controller, made by the "anims" command) has one slot clip per
+/// death. The controller (Assets/Data/Animations/Enemy.controller, made by the "anims" command) has one slot clip per
 /// <see cref="AnimTag"/>; each character gets one of a few sets of clips picked from the <see cref="AnimationLibrary"/> (an
 /// AnimatorOverrideController per set, shared), so a crowd does not move in step.
 /// The Animator runs as usual (Unity updates them all together on worker threads; off screen the bones are left alone);
