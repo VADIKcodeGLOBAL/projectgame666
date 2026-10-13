@@ -16,16 +16,17 @@ using UnityEngine;
 ///    licence from the folder's SOURCE.md; entries edited by hand (tag, weight, on/off) keep the edits; deleted clips leave;
 ///  3 ground speed of walks, runs and climbs measured on the reference character (CharacterRigSetup): root motion if the clip
 ///    travels, otherwise the feet (each pushes back one step length per cycle: speed = 2 x foot travel / cycle);
-///  4 the controller (Assets/Data/Animations/Enemy.controller), when missing or out of date;
+///  4 the controller (Assets/Data/Animations/EnemyCharacter.controller), when missing or out of date: rebuilt in place (its GUID and the
+///    prefabs' references to it stay);
 ///  5 a sheet of every clip on the reference character, four moments each: Logs/shots/anims_sheet*.png.
 /// Adding animations: drop humanoid FBX files into Assets/Art/Animations/&lt;Source&gt;/ (with a SOURCE.md naming the licence) and run "anims".
 /// </summary>
 public static class AnimationLibraryBuilder
 {
     public const string LibraryPath = "Assets/Data/Animations/AnimationLibrary.asset";
-    public const string ControllerPath = "Assets/Data/Animations/Enemy.controller";
+    public const string ControllerPath = "Assets/Data/Animations/EnemyCharacter.controller";
     public const string TestDir = AnimationImport.Root + "/_Test";
-    const string ControllerVersion = "enemy-controller-v1";
+    const string ControllerVersion = "enemy-controller-v5";
     const int Fps = 30;
 
     [MenuItem("Tools/Characters/Build Animation Library")]
@@ -79,6 +80,10 @@ public static class AnimationLibraryBuilder
     /// <summary>"anim-probe &lt;clip name&gt;": where the feet and hands of the reference character are (root space, m) at five moments of a clip.</summary>
     public static void Probe(string clipName)
     {
+        int samples = 5;                                                 // "anim-probe <clip>#<n>": n moments instead of 5
+        int hash = clipName.LastIndexOf('#');
+        if (hash > 0 && int.TryParse(clipName.Substring(hash + 1), out samples)) clipName = clipName.Substring(0, hash); else samples = 5;
+        samples = Mathf.Clamp(samples, 2, 60);
         var character = CharacterRigSetup.Reference;
         var avatar = character != null ? CharacterRigSetup.AvatarOf(character) : null;
         var lib = AssetDatabase.LoadAssetAtPath<AnimationLibrary>(LibraryPath);
@@ -94,9 +99,9 @@ public static class AnimationLibraryBuilder
             EditorAutomation.Log("  " + clip.name + ": " + clip.length.ToString("0.00") + " s, human " + clip.humanMotion + ", loop " + clip.isLooping + ", curves " + AnimationUtility.GetCurveBindings(clip).Length
                                  + ", human scale " + anim.humanScale.ToString("0.000"));
             Func<HumanBodyBones, string> at = b => { var t = anim.GetBoneTransform(b); return t == null ? "-" : inst.transform.InverseTransformPoint(t.position).ToString("F2"); };
-            for (int k = 0; k <= 4; k++)
+            for (int k = 0; k < samples; k++)
             {
-                float time = clip.length * k / 4f;
+                float time = clip.length * k / (samples - 1f);
                 clip.SampleAnimation(inst, time);
                 EditorAutomation.Log("    t=" + time.ToString("0.00") + "  L foot " + at(HumanBodyBones.LeftFoot) + "  R foot " + at(HumanBodyBones.RightFoot)
                                      + "  L hand " + at(HumanBodyBones.LeftHand) + "  R hand " + at(HumanBodyBones.RightHand) + "  hips " + at(HumanBodyBones.Hips));
@@ -104,6 +109,50 @@ public static class AnimationLibraryBuilder
             EditorAutomation.Log("PROBE_OK");
         }
         finally { EditorSceneManager.ClosePreviewScene(scene); }
+    }
+
+    /// <summary>
+    /// "anim-cut &lt;clip&gt;|&lt;new clip&gt;|&lt;from s&gt;|&lt;to s&gt;": a part of a clip as a clip of its own, from the same file (the
+    /// import settings get a second clip; the whole one stays). Name the part with a tag prefix ("Attack_...") to give it its
+    /// tag; run "anims" after. Cutting again under the same name moves the part.
+    /// </summary>
+    public static void Cut(string args)
+    {
+        var a = args.Split('|');
+        float from, to;
+        if (a.Length != 4 || !float.TryParse(a[2].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out from)
+            || !float.TryParse(a[3].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out to) || to <= from)
+        { EditorAutomation.Log("ANIMCUT_FAILED: want anim-cut <clip>|<new clip>|<from s>|<to s>"); return; }
+        string clipName = a[0].Trim(), part = a[1].Trim();
+        foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { AnimationImport.Root }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var mi = AssetImporter.GetAtPath(path) as ModelImporter;
+            if (mi == null) continue;
+            var clips = mi.clipAnimations.Length > 0 ? mi.clipAnimations : mi.defaultClipAnimations;
+            var whole = clips.FirstOrDefault(c => c.name.Equals(clipName, StringComparison.OrdinalIgnoreCase));
+            if (whole == null) continue;
+            var src = AssetDatabase.LoadAllAssetsAtPath(path).OfType<AnimationClip>().FirstOrDefault(c => c.name == whole.name);
+            float fps = src != null && src.frameRate > 0f ? src.frameRate : 30f;
+            float first = Mathf.Max(whole.firstFrame, whole.firstFrame + from * fps), last = Mathf.Min(whole.lastFrame, whole.firstFrame + to * fps);
+            var list = clips.Where(c => !c.name.Equals(part, StringComparison.OrdinalIgnoreCase)).ToList();
+            var cut = new ModelImporterClipAnimation
+            {
+                name = part, takeName = whole.takeName, firstFrame = first, lastFrame = last,
+                loopTime = AnimTags.Loops(AnimTags.Guess(part)),
+                lockRootRotation = whole.lockRootRotation, keepOriginalOrientation = whole.keepOriginalOrientation,
+                lockRootHeightY = whole.lockRootHeightY, keepOriginalPositionY = whole.keepOriginalPositionY,
+                lockRootPositionXZ = whole.lockRootPositionXZ, keepOriginalPositionXZ = whole.keepOriginalPositionXZ,
+            };
+            list.Add(cut);
+            mi.clipAnimations = list.ToArray();
+            mi.SaveAndReimport();
+            EditorAutomation.Log("  " + part + ": frames " + first.ToString("0") + "-" + last.ToString("0") + " (" + ((last - first) / fps).ToString("0.00") + " s at " + fps + " fps) of "
+                                 + whole.name + " in " + path + ", tag " + AnimTags.Guess(part));
+            EditorAutomation.Log("ANIMCUT_OK");
+            return;
+        }
+        EditorAutomation.Log("ANIMCUT_FAILED: no clip named " + clipName + " under " + AnimationImport.Root);
     }
 
     // ------------------------------------------------------------------ 1. test clips
@@ -318,9 +367,20 @@ public static class AnimationLibraryBuilder
     {
         var ctrl = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
         if (ctrl != null && AssetDatabase.GetLabels(ctrl).Contains(ControllerVersion)) return ctrl;
-        if (ctrl != null) AssetDatabase.DeleteAsset(ControllerPath);
-        Directory.CreateDirectory(Path.GetDirectoryName(ControllerPath));
-        ctrl = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
+        if (ctrl == null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(ControllerPath));
+            ctrl = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
+        }
+        else
+        {
+            // rebuilt in place, not deleted and made anew: the asset, its GUID and every prefab's reference to it stay (a new
+            // asset left the prefabs built before its reimport pointing at nothing)
+            foreach (var sub in AssetDatabase.LoadAllAssetsAtPath(ControllerPath)) if (sub != null && sub != ctrl) UnityEngine.Object.DestroyImmediate(sub, true);
+            ctrl.layers = new AnimatorControllerLayer[0];
+            ctrl.parameters = new AnimatorControllerParameter[0];
+            ctrl.AddLayer("Base Layer");
+        }
         ctrl.AddParameter("Gait", AnimatorControllerParameterType.Float);
         ctrl.AddParameter(new AnimatorControllerParameter { name = "Play", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
         ctrl.AddParameter("Climb", AnimatorControllerParameterType.Bool);
@@ -344,7 +404,7 @@ public static class AnimationLibraryBuilder
         var death = sm.AddState("Death"); death.motion = slot(AnimTag.Death);
         To(loco, climb, 0.25f).AddCondition(AnimatorConditionMode.If, 0f, "Climb");
         To(climb, loco, 0.25f).AddCondition(AnimatorConditionMode.IfNot, 0f, "Climb");
-        To(attack, loco, 0.15f, 0.9f);
+        To(attack, loco, 0.3f, 0.9f);                                    // a blow may end low (a pounce): time to stand up
         To(stagger, loco, 0.2f, 0.9f);
         Action<AnimatorState, string, float> fromAny = (state, trigger, duration) =>
         {

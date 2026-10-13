@@ -86,6 +86,17 @@ MonoBehaviour:
     weight: 1
     enabled: 1
     test: 1
+  - clip: {fileID: 4061839508520268033, guid: abb4fef8d787ee54a9435d6a7e6f3916, type: 3}
+    tag: 4
+    source: Mixamo
+    license: "Mixamo / Adobe General Terms \u2014 royalty-free use of the animations
+      in games and other projects, including commercial ones;"
+    file: Assets/Art/Animations/Mixamo/X Bot@Brutal Assassination.fbx
+    loop: 0
+    speed: 0
+    weight: 1
+    enabled: 1
+    test: 0
   - clip: {fileID: -203655887218126122, guid: eeb9c41985ad2ab4e8b51800041485e0, type: 3}
     tag: 4
     source: Mixamo
